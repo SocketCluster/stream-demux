@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/SocketCluster/stream-demux#readme",
   "devDependencies": {
-    "iterable-async-stream": "^1.0.2",
+    "iterable-async-stream": "^1.0.3",
     "mocha": "^5.0.5"
   }
 }
