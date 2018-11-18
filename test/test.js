@@ -56,7 +56,7 @@ describe('StreamDemux', () => {
     assert.equal(receivedAbcPackets[9], 'def9');
   });
 
-  it('should support iteraring over a single substream from multiple consumers at the same time', async () => {
+  it('should support iterating over a single substream from multiple consumers at the same time', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
         await wait(10);
@@ -91,5 +91,26 @@ describe('StreamDemux', () => {
     assert.equal(receivedPacketsA.length, 10);
     assert.equal(receivedPacketsB.length, 10);
     assert.equal(receivedPacketsC.length, 10);
+  });
+
+  it('should support the stream.once() method', async () => {
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        demux.write('hello', 'world' + i);
+      }
+      demux.end('hello');
+    })();
+
+    let substream = demux.stream('hello');
+
+    let packet = await substream.once();
+    assert.equal(packet, 'world0');
+
+    packet = await substream.once();
+    assert.equal(packet, 'world1');
+
+    packet = await substream.once();
+    assert.equal(packet, 'world2');
   });
 });
