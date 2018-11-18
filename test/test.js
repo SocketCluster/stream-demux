@@ -19,7 +19,7 @@ describe('StreamDemux', () => {
     demux = new StreamDemux(stream);
   });
 
-  it('should multiplex across a single stream and demultiplex across multiple substreams', async () => {
+  it('should multiplex over a single stream and demultiplex over multiple substreams', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
         await wait(10);
