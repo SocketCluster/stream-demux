@@ -3,7 +3,13 @@ An asynchronous iterable stream demultiplexer.
 
 Lets you write data to multiple async iterable streams from a central place without keeping any references to those streams.
 
-# Usage
+## Installation
+
+```
+npm install stream-demux
+```
+
+## Usage
 
 ```js
 let demux = new StreamDemux();
@@ -35,7 +41,7 @@ let demux = new StreamDemux();
 })();
 ```
 
-# Goal
+## Goal
 
 The goal of this module is to efficiently distribute data to a large number of named asynchronous streams while facilitating programming patterns which decrease the probability of memory leaks.
 
