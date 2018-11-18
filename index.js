@@ -32,7 +32,7 @@ class StreamDemux {
     }
   }
 
-  getStream(name) {
+  stream(name) {
     return new AsyncIterableStream(() => {
       return this.createDemuxedStream(this.mainStream, name);
     });

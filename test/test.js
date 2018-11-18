@@ -32,13 +32,13 @@ describe('StreamDemux', () => {
 
     await Promise.all([
       (async () => {
-        let substream = demux.getStream('hello');
+        let substream = demux.stream('hello');
         for await (let packet of substream) {
           receivedHelloPackets.push(packet);
         }
       })(),
       (async () => {
-        let substream = demux.getStream('abc');
+        let substream = demux.stream('abc');
         for await (let packet of substream) {
           receivedAbcPackets.push(packet);
         }
@@ -68,7 +68,7 @@ describe('StreamDemux', () => {
     let receivedPacketsA = [];
     let receivedPacketsB = [];
     let receivedPacketsC = [];
-    let substream = demux.getStream('hello');
+    let substream = demux.stream('hello');
 
     await Promise.all([
       (async () => {
