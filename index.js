@@ -1,25 +1,27 @@
+const AsyncIterableStream = require('async-iterable-stream');
+const WritableAsyncIterableStream = require('writable-async-iterable-stream');
 const END_SYMBOL = Symbol('end');
 
 class StreamDemux {
-  constructor(iterableAsyncStream) {
-    this.stream = iterableAsyncStream;
+  constructor() {
+    this.mainStream = new WritableAsyncIterableStream();
   }
 
   write(name, data) {
-    this.stream.write({
+    this.mainStream.write({
       name,
       data
     });
   }
 
   end(name) {
-    this.stream.write({
+    this.mainStream.write({
       name,
       data: END_SYMBOL
     });
   }
 
-  async *createFilteredStream(stream, name) {
+  async *createDemuxedStream(stream, name) {
     for await (let packet of stream) {
       if (packet.name === name) {
         if (packet.data === END_SYMBOL) {
@@ -31,7 +33,9 @@ class StreamDemux {
   }
 
   getStream(name) {
-    return this.createFilteredStream(this.stream, name);
+    return new AsyncIterableStream(() => {
+      return this.createDemuxedStream(this.mainStream, name);
+    });
   }
 }
 

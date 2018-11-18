@@ -1,6 +1,5 @@
 const assert = require('assert');
 const StreamDemux = require('../index');
-const IterableAsyncStream = require('iterable-async-stream');
 
 function wait(duration) {
   return new Promise((resolve) => {
@@ -11,15 +10,13 @@ function wait(duration) {
 }
 
 describe('StreamDemux', () => {
-  let stream;
   let demux;
 
   beforeEach(async () => {
-    stream = new IterableAsyncStream();
-    demux = new StreamDemux(stream);
+    demux = new StreamDemux();
   });
 
-  it('should multiplex over a single stream and demultiplex over multiple substreams', async () => {
+  it('should demultiplex packets over multiple substreams', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
         await wait(10);
@@ -57,5 +54,42 @@ describe('StreamDemux', () => {
     assert.equal(receivedAbcPackets[0], 'def0');
     assert.equal(receivedAbcPackets[1], 'def1');
     assert.equal(receivedAbcPackets[9], 'def9');
+  });
+
+  it('should support iteraring over a single substream from multiple consumers at the same time', async () => {
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        demux.write('hello', 'world' + i);
+      }
+      demux.end('hello');
+    })();
+
+    let receivedPacketsA = [];
+    let receivedPacketsB = [];
+    let receivedPacketsC = [];
+    let substream = demux.getStream('hello');
+
+    await Promise.all([
+      (async () => {
+        for await (let packet of substream) {
+          receivedPacketsA.push(packet);
+        }
+      })(),
+      (async () => {
+        for await (let packet of substream) {
+          receivedPacketsB.push(packet);
+        }
+      })(),
+      (async () => {
+        for await (let packet of substream) {
+          receivedPacketsC.push(packet);
+        }
+      })()
+    ]);
+
+    assert.equal(receivedPacketsA.length, 10);
+    assert.equal(receivedPacketsB.length, 10);
+    assert.equal(receivedPacketsC.length, 10);
   });
 });
