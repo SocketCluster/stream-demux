@@ -41,6 +41,15 @@ let demux = new StreamDemux();
   demux.end('abc');
   demux.end('def');
 })();
+
+// Utility function for using setTimeout() with async/await.
+function wait(duration) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, duration);
+  });
+}
 ```
 
 ## Goal
