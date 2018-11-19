@@ -28,7 +28,7 @@
     "mocha": "^5.0.5"
   },
   "dependencies": {
-    "async-iterable-stream": "^1.0.1",
-    "writable-async-iterable-stream": "^1.0.9"
+    "async-iterable-stream": "^1.0.3",
+    "writable-async-iterable-stream": "^1.1.0"
   }
 }
