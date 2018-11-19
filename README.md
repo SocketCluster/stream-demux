@@ -54,7 +54,7 @@ function wait(duration) {
 
 ## Goal
 
-The goal of this module is to efficiently distribute data to a large number of named asynchronous streams while facilitating programming patterns which decrease the probability of memory leaks.
+The goal of this module is to efficiently distribute data to a large number of named asynchronous streams while facilitating functional programming patterns which decrease the probability of memory leaks.
 
 Each stream returned by this module is responsible for picking up its own data from a shared source stream - This means that the stream-demux module doesn't hold any references to streams which it produces via its `stream()` method; this reduces the likelihood of programming mistakes which would lead to memory leaks because streams don't need to be destroyed or cleaned up explicitly.
 
