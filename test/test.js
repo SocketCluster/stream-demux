@@ -1,12 +1,22 @@
 const assert = require('assert');
 const StreamDemux = require('../index');
 
+let pendingTimeoutSet = new Set();
+
 function wait(duration) {
   return new Promise((resolve) => {
-    setTimeout(() => {
+    let timeout = setTimeout(() => {
+      pendingTimeoutSet.clear(timeout);
       resolve();
     }, duration);
+    pendingTimeoutSet.add(timeout);
   });
+}
+
+function cancelAllPendingWaits() {
+  for (let timeout of pendingTimeoutSet) {
+    clearTimeout(timeout);
+  }
 }
 
 describe('StreamDemux', () => {
@@ -14,6 +24,10 @@ describe('StreamDemux', () => {
 
   beforeEach(async () => {
     demux = new StreamDemux();
+  });
+
+  afterEach(async () => {
+    cancelAllPendingWaits();
   });
 
   it('should demultiplex packets over multiple substreams', async () => {
@@ -112,5 +126,23 @@ describe('StreamDemux', () => {
 
     packet = await substream.once();
     assert.equal(packet, 'world2');
+  });
+
+  it('should not resolve stream.once() when stream is ended', async () => {
+    (async () => {
+      await wait(10);
+      demux.end('hello');
+    })();
+
+    let substream = demux.stream('hello');
+    let receivedPackets = [];
+
+    (async () => {
+      let packet = await substream.once();
+      receivedPackets.push(packet);
+    })();
+
+    await wait(100);
+    assert.equal(receivedPackets.length, 0);
   });
 });
