@@ -107,14 +107,14 @@ describe('StreamDemux', () => {
     assert.equal(receivedPacketsC.length, 10);
   });
 
-  it('should support ending all streams using a single command', async () => {
+  it('should support ending all streams using a single endAll command', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
         await wait(10);
         demux.write('hello', 'world' + i);
         demux.write('abc', 'def' + i);
       }
-      demux.end();
+      demux.endAll();
     })();
 
     let receivedHelloPackets = [];
