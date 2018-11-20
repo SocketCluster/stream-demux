@@ -107,6 +107,38 @@ describe('StreamDemux', () => {
     assert.equal(receivedPacketsC.length, 10);
   });
 
+  it('should support ending all streams using a single command', async () => {
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        demux.write('hello', 'world' + i);
+        demux.write('abc', 'def' + i);
+      }
+      demux.end();
+    })();
+
+    let receivedHelloPackets = [];
+    let receivedAbcPackets = [];
+
+    await Promise.all([
+      (async () => {
+        let substream = demux.stream('hello');
+        for await (let packet of substream) {
+          receivedHelloPackets.push(packet);
+        }
+      })(),
+      (async () => {
+        let substream = demux.stream('abc');
+        for await (let packet of substream) {
+          receivedAbcPackets.push(packet);
+        }
+      })()
+    ]);
+
+    assert.equal(receivedHelloPackets.length, 10);
+    assert.equal(receivedAbcPackets.length, 10);
+  });
+
   it('should support the stream.once() method', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {

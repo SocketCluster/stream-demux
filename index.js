@@ -15,10 +15,14 @@ class StreamDemux {
   }
 
   end(name) {
-    this.mainStream.write({
-      name,
-      data: END_SYMBOL
-    });
+    if (name === undefined) {
+      this.mainStream.end();
+    } else {
+      this.mainStream.write({
+        name,
+        data: END_SYMBOL
+      });
+    }
   }
 
   async *createDemuxedStream(stream, name) {
