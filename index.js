@@ -4,28 +4,28 @@ const END_SYMBOL = Symbol('end');
 
 class StreamDemux {
   constructor() {
-    this.mainStream = new WritableAsyncIterableStream();
+    this._mainStream = new WritableAsyncIterableStream();
   }
 
   write(name, data) {
-    this.mainStream.write({
+    this._mainStream.write({
       name,
       data
     });
   }
 
   end(name) {
-    this.mainStream.write({
+    this._mainStream.write({
       name,
       data: END_SYMBOL
     });
   }
 
   endAll() {
-    this.mainStream.end();
+    this._mainStream.end();
   }
 
-  async *createDemuxedStream(stream, name) {
+  async *_createDemuxedStream(stream, name) {
     for await (let packet of stream) {
       if (packet.name === name) {
         if (packet.data === END_SYMBOL) {
@@ -38,7 +38,7 @@ class StreamDemux {
 
   stream(name) {
     return new AsyncIterableStream(() => {
-      return this.createDemuxedStream(this.mainStream, name);
+      return this._createDemuxedStream(this._mainStream, name);
     });
   }
 }
