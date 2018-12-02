@@ -15,10 +15,7 @@ class StreamDemux {
   }
 
   end(name) {
-    this._mainStream.write({
-      name,
-      data: END_SYMBOL
-    });
+    this.write(name, END_SYMBOL);
   }
 
   endAll() {

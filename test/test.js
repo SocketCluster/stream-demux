@@ -145,6 +145,38 @@ describe('StreamDemux', () => {
         await wait(10);
         demux.write('hello', 'a' + i);
       }
+      demux.end('hello');
+    })();
+
+    let receivedPacketsA = [];
+    for await (let packet of demux.stream('hello')) {
+      receivedPacketsA.push(packet);
+    }
+
+    assert.equal(receivedPacketsA.length, 10);
+
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        demux.write('hello', 'b' + i);
+      }
+      demux.end('hello');
+    })();
+
+    let receivedPacketsB = [];
+    for await (let packet of demux.stream('hello')) {
+      receivedPacketsB.push(packet);
+    }
+
+    assert.equal(receivedPacketsB.length, 10);
+  });
+
+  it('should support resuming stream consumption after the stream has been ended using endAll', async () => {
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        demux.write('hello', 'a' + i);
+      }
       demux.endAll();
     })();
 
@@ -165,58 +197,6 @@ describe('StreamDemux', () => {
 
     let receivedPacketsB = [];
     for await (let packet of demux.stream('hello')) {
-      receivedPacketsB.push(packet);
-    }
-
-    assert.equal(receivedPacketsB.length, 10);
-  });
-
-  it('should support resuming stream consumption published within the same stack frame after the stream has been ended', async () => {
-    for (let i = 0; i < 10; i++) {
-      demux.write('foo', 'a' + i);
-    }
-    demux.end('foo');
-
-    let receivedPacketsA = [];
-    for await (let packet of demux.stream('foo')) {
-      receivedPacketsA.push(packet);
-    }
-
-    assert.equal(receivedPacketsA.length, 10);
-
-    for (let i = 0; i < 10; i++) {
-      demux.write('foo', 'b' + i);
-    }
-    demux.end('foo');
-
-    let receivedPacketsB = [];
-    for await (let packet of demux.stream('foo')) {
-      receivedPacketsB.push(packet);
-    }
-
-    assert.equal(receivedPacketsB.length, 10);
-  });
-
-  it('should support resuming stream consumption published within the same stack frame after the stream has been ended using endAll', async () => {
-    for (let i = 0; i < 10; i++) {
-      demux.write('foo', 'a' + i);
-    }
-    demux.endAll();
-
-    let receivedPacketsA = [];
-    for await (let packet of demux.stream('foo')) {
-      receivedPacketsA.push(packet);
-    }
-
-    assert.equal(receivedPacketsA.length, 10);
-
-    for (let i = 0; i < 10; i++) {
-      demux.write('foo', 'b' + i);
-    }
-    demux.endAll();
-
-    let receivedPacketsB = [];
-    for await (let packet of demux.stream('foo')) {
       receivedPacketsB.push(packet);
     }
 
