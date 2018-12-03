@@ -29,6 +29,6 @@
   },
   "dependencies": {
     "async-iterable-stream": "^1.2.1",
-    "writable-async-iterable-stream": "^2.0.1"
+    "writable-async-iterable-stream": "^2.0.2"
   }
 }
