@@ -2,7 +2,7 @@
 An asynchronous iterable stream demultiplexer.
 
 Lets you write data to multiple async iterable streams from a central place without keeping any references to those streams.
-The `StreamDemux` class returns streams of type `AsyncIterableStream`.  
+The `StreamDemux` class returns streams of type `DemuxedAsyncIterableStream` (base type `AsyncIterableStream`).  
 See https://github.com/SocketCluster/async-iterable-stream
 
 ## Installation
