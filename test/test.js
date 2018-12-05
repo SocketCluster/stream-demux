@@ -241,4 +241,46 @@ describe('StreamDemux', () => {
     await wait(100);
     assert.equal(receivedPackets.length, 0);
   });
+
+  it('should support stream.next() method with end command', async () => {
+    (async () => {
+      for (let i = 0; i < 3; i++) {
+        await wait(10);
+        demux.write('hello', 'world' + i);
+      }
+      await wait(10);
+      demux.end('hello');
+    })();
+
+    let substream = demux.stream('hello');
+
+    let packet = await substream.next();
+    assert.equal(JSON.stringify(packet), JSON.stringify({value: 'world0', done: false}));
+
+    packet = await substream.next();
+    assert.equal(JSON.stringify(packet), JSON.stringify({value: 'world1', done: false}));
+
+    packet = await substream.next();
+    assert.equal(JSON.stringify(packet), JSON.stringify({value: 'world2', done: false}));
+
+    packet = await substream.next();
+    assert.equal(JSON.stringify(packet), JSON.stringify({value: undefined, done: true}));
+  });
+
+  it('should support stream.next() method with endAll command', async () => {
+    (async () => {
+      await wait(10);
+      demux.write('hello', 'world');
+      await wait(10);
+      demux.endAll();
+    })();
+
+    let substream = demux.stream('hello');
+
+    let packet = await substream.next();
+    assert.equal(JSON.stringify(packet), JSON.stringify({value: 'world', done: false}));
+
+    packet = await substream.next();
+    assert.equal(JSON.stringify(packet), JSON.stringify({value: undefined, done: true}));
+  });
 });

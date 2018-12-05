@@ -7,36 +7,68 @@ class StreamDemux {
     this._mainStream = new WritableAsyncIterableStream();
   }
 
-  write(name, data) {
+  _write(name, value, done) {
     this._mainStream.write({
       name,
-      data
+      data: {value, done}
     });
   }
 
+  write(name, value) {
+    this._write(name, value, false);
+  }
+
   end(name) {
-    this.write(name, END_SYMBOL);
+    this._write(name, undefined, true);
   }
 
   endAll() {
     this._mainStream.end();
   }
 
-  async *_createDemuxedStream(stream, name) {
-    for await (let packet of stream) {
-      if (packet.name === name) {
-        if (packet.data === END_SYMBOL) {
-          return;
-        }
-        yield packet.data;
+  async _next(name, mainAsyncIterator) {
+    while (true) {
+      let packet = await mainAsyncIterator.next();
+      if (packet.done) {
+        return packet;
+      }
+      if (packet.value.name === name) {
+        return packet.value.data;
+      }
+    }
+  }
+
+  next(name) {
+    return this._next(name, this._mainStream);
+  }
+
+  createAsyncIterator(name) {
+    let mainStreamIterator = this._mainStream.createAsyncIterator();
+    return {
+      next: async () => {
+        return this._next(name, mainStreamIterator);
       }
     }
   }
 
   stream(name) {
-    return new AsyncIterableStream(() => {
-      return this._createDemuxedStream(this._mainStream, name);
-    });
+    return new DemuxedAsyncIterableStream(this, name);
+  }
+}
+
+class DemuxedAsyncIterableStream extends AsyncIterableStream {
+  constructor(streamDemux, name) {
+    super();
+    this.name = name;
+    this._streamDemux = streamDemux;
+  }
+
+  next() {
+    return this._streamDemux.next(this.name);
+  }
+
+  createAsyncIterator() {
+    return this._streamDemux.createAsyncIterator(this.name);
   }
 }
 
