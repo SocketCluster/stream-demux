@@ -107,6 +107,32 @@ describe('StreamDemux', () => {
     assert.equal(receivedPacketsC.length, 10);
   });
 
+  it('should support iterating over a substream using a while loop', async () => {
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        demux.write('hello', 'world' + i);
+        demux.write('hello', 'foo' + i);
+      }
+      demux.end('hello');
+    })();
+
+    let receivedPackets = [];
+    let asyncIterator = demux.stream('hello').createAsyncIterator();
+
+    while (true) {
+      let packet = await asyncIterator.next();
+      if (packet.done) break;
+      receivedPackets.push(packet.value);
+    }
+
+    assert.equal(receivedPackets.length, 20);
+    assert.equal(receivedPackets[0], 'world0');
+    assert.equal(receivedPackets[1], 'foo0');
+    assert.equal(receivedPackets[2], 'world1');
+    assert.equal(receivedPackets[3], 'foo1');
+  });
+
   it('should support ending all streams using a single endAll command', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
