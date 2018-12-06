@@ -25,27 +25,19 @@ class StreamDemux {
     this._mainStream.end();
   }
 
-  async _next(name, mainAsyncIterator) {
-    while (true) {
-      let packet = await mainAsyncIterator.next();
-      if (packet.done) {
-        return packet;
-      }
-      if (packet.value.name === name) {
-        return packet.value.data;
-      }
-    }
-  }
-
-  next(name) {
-    return this._next(name, this._mainStream);
-  }
-
   createAsyncIterator(name) {
     let mainStreamIterator = this._mainStream.createAsyncIterator();
     return {
       next: async () => {
-        return this._next(name, mainStreamIterator);
+        while (true) {
+          let packet = await mainStreamIterator.next();
+          if (packet.done) {
+            return packet;
+          }
+          if (packet.value.name === name) {
+            return packet.value.data;
+          }
+        }
       }
     }
   }
@@ -60,10 +52,6 @@ class DemuxedAsyncIterableStream extends AsyncIterableStream {
     super();
     this.name = name;
     this._streamDemux = streamDemux;
-  }
-
-  next() {
-    return this._streamDemux.next(this.name);
   }
 
   createAsyncIterator() {
