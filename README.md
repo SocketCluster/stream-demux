@@ -34,10 +34,9 @@ let demux = new StreamDemux();
 
 (async () => {
   // Consume data from 'def' stream.
-  // Can also work with a while loop for
-  // older environments.
-  // Can have multiple loops consuming the same
-  // stream at the same time.
+  // Can also work with a while loop for older environments.
+  // Can have multiple loops consuming the same stream at
+  // the same time.
   let asyncIterator = demux.stream('def').getAsyncIterator();
   while (true) {
     let packet = await asyncIterator.next();
