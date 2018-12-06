@@ -1,6 +1,5 @@
 const AsyncIterableStream = require('async-iterable-stream');
 const WritableAsyncIterableStream = require('writable-async-iterable-stream');
-const END_SYMBOL = Symbol('end');
 
 class StreamDemux {
   constructor() {
