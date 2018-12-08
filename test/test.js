@@ -37,8 +37,8 @@ describe('StreamDemux', () => {
         demux.write('hello', 'world' + i);
         demux.write('abc', 'def' + i);
       }
-      demux.end('hello');
-      demux.end('abc');
+      demux.close('hello');
+      demux.close('abc');
     })();
 
     let receivedHelloPackets = [];
@@ -76,7 +76,7 @@ describe('StreamDemux', () => {
         await wait(10);
         demux.write('hello', 'world' + i);
       }
-      demux.end('hello');
+      demux.close('hello');
     })();
 
     let receivedPacketsA = [];
@@ -114,7 +114,7 @@ describe('StreamDemux', () => {
         demux.write('hello', 'world' + i);
         demux.write('hello', 'foo' + i);
       }
-      demux.end('hello');
+      demux.close('hello');
     })();
 
     let receivedPackets = [];
@@ -133,14 +133,14 @@ describe('StreamDemux', () => {
     assert.equal(receivedPackets[3], 'foo1');
   });
 
-  it('should support ending all streams using a single endAll command', async () => {
+  it('should support closing all streams using a single closeAll command', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
         await wait(10);
         demux.write('hello', 'world' + i);
         demux.write('abc', 'def' + i);
       }
-      demux.endAll();
+      demux.closeAll();
     })();
 
     let receivedHelloPackets = [];
@@ -165,13 +165,13 @@ describe('StreamDemux', () => {
     assert.equal(receivedAbcPackets.length, 10);
   });
 
-  it('should support resuming stream consumption after the stream has been ended', async () => {
+  it('should support resuming stream consumption after the stream has been closed', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
         await wait(10);
         demux.write('hello', 'a' + i);
       }
-      demux.end('hello');
+      demux.close('hello');
     })();
 
     let receivedPacketsA = [];
@@ -186,7 +186,7 @@ describe('StreamDemux', () => {
         await wait(10);
         demux.write('hello', 'b' + i);
       }
-      demux.end('hello');
+      demux.close('hello');
     })();
 
     let receivedPacketsB = [];
@@ -197,13 +197,13 @@ describe('StreamDemux', () => {
     assert.equal(receivedPacketsB.length, 10);
   });
 
-  it('should support resuming stream consumption after the stream has been ended using endAll', async () => {
+  it('should support resuming stream consumption after the stream has been closed using closeAll', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
         await wait(10);
         demux.write('hello', 'a' + i);
       }
-      demux.endAll();
+      demux.closeAll();
     })();
 
     let receivedPacketsA = [];
@@ -218,7 +218,7 @@ describe('StreamDemux', () => {
         await wait(10);
         demux.write('hello', 'b' + i);
       }
-      demux.endAll();
+      demux.closeAll();
     })();
 
     let receivedPacketsB = [];
@@ -235,7 +235,7 @@ describe('StreamDemux', () => {
         await wait(10);
         demux.write('hello', 'world' + i);
       }
-      demux.end('hello');
+      demux.close('hello');
     })();
 
     let substream = demux.stream('hello');
@@ -250,10 +250,10 @@ describe('StreamDemux', () => {
     assert.equal(packet, 'world2');
   });
 
-  it('should not resolve stream.once() when stream is ended', async () => {
+  it('should not resolve stream.once() when stream is closed', async () => {
     (async () => {
       await wait(10);
-      demux.end('hello');
+      demux.close('hello');
     })();
 
     let substream = demux.stream('hello');
@@ -268,14 +268,40 @@ describe('StreamDemux', () => {
     assert.equal(receivedPackets.length, 0);
   });
 
-  it('should support stream.next() method with end command', async () => {
+  it('should support the stream.once() method with timeout', async () => {
+    (async () => {
+      for (let i = 0; i < 3; i++) {
+        await wait(20);
+        demux.write('hello', 'world' + i);
+      }
+      demux.close('hello');
+    })();
+
+    let substream = demux.stream('hello');
+
+    let packet = await substream.once(30);
+    assert.equal(packet, 'world0');
+
+    let error;
+    packet = null;
+    try {
+      packet = await substream.once(10);
+    } catch (err) {
+      error = err;
+    }
+    assert.notEqual(error, null);
+    assert.equal(error.name, 'TimeoutError');
+    assert.equal(packet, null);
+  });
+
+  it('should support stream.next() method with close command', async () => {
     (async () => {
       for (let i = 0; i < 3; i++) {
         await wait(10);
         demux.write('hello', 'world' + i);
       }
       await wait(10);
-      demux.end('hello');
+      demux.close('hello');
     })();
 
     let substream = demux.stream('hello');
@@ -293,12 +319,12 @@ describe('StreamDemux', () => {
     assert.equal(JSON.stringify(packet), JSON.stringify({value: undefined, done: true}));
   });
 
-  it('should support stream.next() method with endAll command', async () => {
+  it('should support stream.next() method with closeAll command', async () => {
     (async () => {
       await wait(10);
       demux.write('hello', 'world');
       await wait(10);
-      demux.endAll();
+      demux.closeAll();
     })();
 
     let substream = demux.stream('hello');

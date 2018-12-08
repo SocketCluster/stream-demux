@@ -51,8 +51,8 @@ let demux = new StreamDemux();
     demux.write('abc', 'message-abc-' + i);
     demux.write('def', 'message-def-' + i);
   }
-  demux.end('abc');
-  demux.end('def');
+  demux.close('abc');
+  demux.close('def');
 })();
 
 // Utility function for using setTimeout() with async/await.

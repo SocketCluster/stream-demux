@@ -17,16 +17,16 @@ class StreamDemux {
     this._write(name, value, false);
   }
 
-  end(name) {
+  close(name) {
     this._write(name, undefined, true);
   }
 
-  endAll() {
-    this._mainStream.end();
+  closeAll() {
+    this._mainStream.close();
   }
 
-  createAsyncIterator(name) {
-    let mainStreamIterator = this._mainStream.createAsyncIterator();
+  createAsyncIterator(name, timeout) {
+    let mainStreamIterator = this._mainStream.createAsyncIterator(timeout);
     return {
       next: async () => {
         while (true) {
@@ -54,8 +54,8 @@ class DemuxedAsyncIterableStream extends AsyncIterableStream {
     this._streamDemux = streamDemux;
   }
 
-  createAsyncIterator() {
-    return this._streamDemux.createAsyncIterator(this.name);
+  createAsyncIterator(timeout) {
+    return this._streamDemux.createAsyncIterator(this.name, timeout);
   }
 }
 
