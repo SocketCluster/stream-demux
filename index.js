@@ -1,5 +1,5 @@
-const AsyncIterableStream = require('async-iterable-stream');
 const WritableAsyncIterableStream = require('writable-async-iterable-stream');
+const DemuxedAsyncIterableStream = require('./demuxed-async-iterable-stream');
 
 class StreamDemux {
   constructor() {
@@ -44,18 +44,6 @@ class StreamDemux {
 
   stream(name) {
     return new DemuxedAsyncIterableStream(this, name);
-  }
-}
-
-class DemuxedAsyncIterableStream extends AsyncIterableStream {
-  constructor(streamDemux, name) {
-    super();
-    this.name = name;
-    this._streamDemux = streamDemux;
-  }
-
-  createAsyncIterator(timeout) {
-    return this._streamDemux.createAsyncIterator(this.name, timeout);
   }
 }
 
