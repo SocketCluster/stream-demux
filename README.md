@@ -13,6 +13,8 @@ npm install stream-demux
 
 ## Usage
 
+### Consuming using async loops
+
 ```js
 let demux = new StreamDemux();
 
@@ -63,6 +65,31 @@ function wait(duration) {
     }, duration);
   });
 }
+```
+
+### Consuming using the once method
+
+```js
+// Log the next received packet from the abc stream.
+(async () => {
+  // The returned promise never times out.
+  let packet = await demux.stream('abc').once();
+  console.log('Packet:', packet);
+})();
+
+// Same as above, except with a timeout of 10 seconds.
+(async () => {
+  let packet;
+  try {
+    packet = await demux.stream('abc').once(10000);
+    console.log('Packet:', packet);
+  } catch (err) {
+    // If no packets are written to the 'abc' stream before
+    // the timeout, an error will be thrown and handled here.
+    // The err.name property will be 'TimeoutError'.
+    console.log('Error:', err);
+  }
+})();
 ```
 
 ## Goal
