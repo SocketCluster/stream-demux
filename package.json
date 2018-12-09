@@ -1,6 +1,6 @@
 {
   "name": "stream-demux",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "An iterable asynchronous stream demultiplexer.",
   "main": "index.js",
   "scripts": {
