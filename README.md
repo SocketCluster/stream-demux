@@ -79,9 +79,8 @@ function wait(duration) {
 
 // Same as above, except with a timeout of 10 seconds.
 (async () => {
-  let packet;
   try {
-    packet = await demux.stream('abc').once(10000);
+    let packet = await demux.stream('abc').once(10000);
     console.log('Packet:', packet);
   } catch (err) {
     // If no packets are written to the 'abc' stream before
