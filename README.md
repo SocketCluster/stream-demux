@@ -41,7 +41,7 @@ let demux = new StreamDemux();
   // the same time.
   // Note that you can optionally pass a number n to the
   // createAsyncIterator(n) method to force the iteration to
-  // timeout after n milliseconds of innactivity.s
+  // timeout after n milliseconds of innactivity.
   let asyncIterator = demux.stream('def').createAsyncIterator();
   while (true) {
     let packet = await asyncIterator.next();
