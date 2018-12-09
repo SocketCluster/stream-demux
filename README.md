@@ -39,7 +39,10 @@ let demux = new StreamDemux();
   // Can also work with a while loop for older environments.
   // Can have multiple loops consuming the same stream at
   // the same time.
-  let asyncIterator = demux.stream('def').getAsyncIterator();
+  // Note that you can optionally pass a number n to the
+  // createAsyncIterator(n) method to force the iteration to
+  // timeout after n milliseconds of innactivity.s
+  let asyncIterator = demux.stream('def').createAsyncIterator();
   while (true) {
     let packet = await asyncIterator.next();
     if (packet.done) break;
