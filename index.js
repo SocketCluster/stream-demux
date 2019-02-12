@@ -38,6 +38,9 @@ class StreamDemux {
             return packet.value.data;
           }
         }
+      },
+      return: () => {
+        return mainStreamIterator.return();
       }
     }
   }

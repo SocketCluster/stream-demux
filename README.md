@@ -5,11 +5,6 @@ Lets you write data to multiple async iterable streams from a central place with
 The `StreamDemux` class returns streams of class `DemuxedAsyncIterableStream` (base class `AsyncIterableStream`).  
 See https://github.com/SocketCluster/async-iterable-stream
 
-This library is currently less than 70 lines of code in total (including whitespace) and has 2 dependencies:
-
-- AsyncIterableStream: < 40 LOC
-- WritableAsyncIterableStream: < 90 LOC
-
 This library uses a queue which is implemented as a singly-linked list; this allows each loop to consume at its own pace without missing any events (supports nested await statements). An 'event' in the queue can be garbage-collected as soon as the slowest consumer moves its pointer past it.
 
 ## Installation
