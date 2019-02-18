@@ -339,15 +339,78 @@ describe('StreamDemux', () => {
   });
 
   it('should support writeToConsumer method', async () => {
+    let receivedPackets = [];
+    let consumer = demux.stream('hello').createConsumer();
 
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        demux.writeToConsumer(consumer.id, 'world' + i);
+      }
+      // Writing to a non-existent consumer should be ignored.
+      demux.writeToConsumer(123, 'foo');
+      demux.close('hello', 'hi');
+    })();
+
+    while (true) {
+      let packet = await consumer.next();
+      receivedPackets.push(packet.value);
+      if (packet.done) break;
+    }
+
+    assert.equal(receivedPackets.length, 11);
+    assert.equal(receivedPackets[0], 'world0');
+    assert.equal(receivedPackets[1], 'world1');
+    assert.equal(receivedPackets[9], 'world9');
+    assert.equal(receivedPackets[10], 'hi');
   });
 
   it('should support closeConsumer method', async () => {
+    let receivedPackets = [];
+    let consumer = demux.stream('hello').createConsumer();
 
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        demux.write('hello', 'world' + i);
+      }
+      demux.closeConsumer(consumer.id, 'hi');
+
+      // Closing a non-existent consumer should be ignored.
+      demux.closeConsumer(123, 'bar');
+    })();
+
+    while (true) {
+      let packet = await consumer.next();
+      receivedPackets.push(packet.value);
+      if (packet.done) break;
+    }
+
+    assert.equal(receivedPackets.length, 11);
+    assert.equal(receivedPackets[0], 'world0');
+    assert.equal(receivedPackets[1], 'world1');
+    assert.equal(receivedPackets[9], 'world9');
+    assert.equal(receivedPackets[10], 'hi');
   });
 
   it('should support getConsumerStats method', async () => {
+    let consumer = demux.stream('hello').createConsumer();
 
+    for (let i = 0; i < 10; i++) {
+      demux.write('hello', 'world' + i);
+    }
+    demux.close('hello', 'hi');
+
+    let consumerStats = demux.getConsumerStats(consumer.id);
+    assert.notEqual(consumerStats, null);
+    assert.equal(consumerStats.id, consumer.id);
+    assert.equal(consumerStats.backpressure, 11);
+    assert.equal(consumerStats.backpressure, consumer.backpressure);
+
+    consumer.return();
+
+    consumerStats = demux.getConsumerStats(consumer.id);
+    assert.equal(consumerStats, undefined);
   });
 
   it('should support getConsumerStatsList method', async () => {

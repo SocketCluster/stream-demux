@@ -41,7 +41,6 @@ class StreamDemux {
   }
 
   closeConsumer(consumerId, value) {
-    this._write(value, true, consumerId);
     this._mainStream.closeConsumer(consumerId, {
       consumerId,
       data: {
@@ -114,14 +113,16 @@ class StreamDemux {
     mainStreamConsumer.next = async function () {
       while (true) {
         let packet = await consumerNext.apply(this, arguments);
+        if (packet.value) {
+          if (
+            packet.value.consumerId ||
+            packet.value.streamName === streamName
+          ) {
+            return packet.value.data;
+          }
+        }
         if (packet.done) {
           return packet;
-        }
-        if (
-          packet.value.streamName === streamName ||
-          packet.value.consumerId === mainStreamConsumer.id
-        ) {
-          return packet.value.data;
         }
       }
     };
