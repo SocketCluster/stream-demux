@@ -118,10 +118,12 @@ describe('StreamDemux', () => {
     })();
 
     let receivedPackets = [];
-    let asyncIterator = demux.stream('hello').createAsyncIterator();
+    let consumer = demux.stream('hello').createConsumer();
+
+    assert.equal(consumer.backpressure, 0);
 
     while (true) {
-      let packet = await asyncIterator.next();
+      let packet = await consumer.next();
       if (packet.done) break;
       receivedPackets.push(packet.value);
     }
@@ -334,5 +336,87 @@ describe('StreamDemux', () => {
 
     packet = await substream.next();
     assert.equal(JSON.stringify(packet), JSON.stringify({value: undefined, done: true}));
+  });
+
+  it('should support writeToConsumer method', async () => {
+
+  });
+
+  it('should support closeConsumer method', async () => {
+
+  });
+
+  it('should support getConsumerStats method', async () => {
+
+  });
+
+  it('should support getConsumerStatsList method', async () => {
+
+  });
+
+  it('should support getConsumerStatsListAll method', async () => {
+
+  });
+
+  it('should support kill method', async () => {
+
+  });
+
+  it('should support killAll method', async () => {
+
+  });
+
+  it('should support killConsumer method', async () => {
+
+  });
+
+  it('should support getBackpressure method', async () => {
+
+  });
+
+  it('should support getConsumerBackpressure method', async () => {
+
+  });
+
+  it('should support hasConsumer method', async () => {
+
+  });
+
+  describe('DemuxedConsumableStream', () => {
+    it('should support writeToConsumer method', async () => {
+
+    });
+
+    it('should support closeConsumer method', async () => {
+
+    });
+
+    it('should support getConsumerStats method', async () => {
+
+    });
+
+    it('should support getConsumerStatsList method', async () => {
+
+    });
+
+    it('should support kill method', async () => {
+
+    });
+
+    it('should support killConsumer method', async () => {
+
+    });
+
+    it('should support getBackpressure method', async () => {
+
+    });
+
+    it('should support getConsumerBackpressure method', async () => {
+
+    });
+
+    it('should support hasConsumer method', async () => {
+
+    });
   });
 });

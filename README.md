@@ -1,9 +1,9 @@
 # stream-demux
-An asynchronous iterable stream demultiplexer.
+An consumable stream demultiplexer.
 
-Lets you write data to multiple async iterable streams from a central place without keeping any references to those streams.
-The `StreamDemux` class returns streams of class `DemuxedAsyncIterableStream` (base class `AsyncIterableStream`).  
-See https://github.com/SocketCluster/async-iterable-stream
+Lets you write data to multiple consumable streams from a central place without keeping any references to those streams.
+The `StreamDemux` class returns streams of class `DemuxedConsumableStream` (base class `ConsumableStream`).  
+See https://github.com/SocketCluster/consumable-stream
 
 This library uses a queue which is implemented as a singly-linked list; this allows each loop to consume at its own pace without missing any events (supports nested await statements). An 'event' in the queue can be garbage-collected as soon as the slowest consumer moves its pointer past it.
 
@@ -42,11 +42,11 @@ let demux = new StreamDemux();
   // Can have multiple loops consuming the same stream at
   // the same time.
   // Note that you can optionally pass a number n to the
-  // createAsyncIterator(n) method to force the iteration to
+  // createConsumer(n) method to force the iteration to
   // timeout after n milliseconds of innactivity.
-  let asyncIterator = demux.stream('def').createAsyncIterator();
+  let consumer = demux.stream('def').createConsumer();
   while (true) {
-    let packet = await asyncIterator.next();
+    let packet = await consumer.next();
     if (packet.done) break;
     console.log('DEF (while loop):', packet.value);
   }
