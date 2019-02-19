@@ -8,7 +8,7 @@ class StreamDemux {
 
   write(streamName, value) {
     this._mainStream.write({
-      streamName,
+      stream: streamName,
       data: {
         value,
         done: false
@@ -18,7 +18,7 @@ class StreamDemux {
 
   close(streamName, value) {
     this._mainStream.write({
-      streamName,
+      stream: streamName,
       data: {
         value,
         done: true
@@ -57,11 +57,11 @@ class StreamDemux {
   getConsumerStatsList(streamName) {
     let consumerList = this._mainStream.getConsumerStatsList();
     return consumerList.filter((consumerStats) => {
-      return consumerStats.streamName === streamName;
+      return consumerStats.stream === streamName;
     });
   }
 
-  getConsumerStatsListAll(streamName) {
+  getConsumerStatsListAll() {
     return this._mainStream.getConsumerStatsList();
   }
 
@@ -95,28 +95,34 @@ class StreamDemux {
     return maxBackpressure;
   }
 
+  getBackpressureAll() {
+    return this._mainStream.getBackpressure();
+  }
+
   getConsumerBackpressure(consumerId) {
-    this._mainStream.getConsumerBackpressure(consumerId);
+    return this._mainStream.getConsumerBackpressure(consumerId);
   }
 
   hasConsumer(streamName, consumerId) {
-    this._mainStream.hasConsumer(consumerId); // TODO 2
+    let consumerStats = this._mainStream.getConsumerStats(consumerId);
+    return !!consumerStats && consumerStats.stream === streamName;
   }
 
   hasConsumerAll(consumerId) {
-    this._mainStream.hasConsumer(consumerId);
+    return this._mainStream.hasConsumer(consumerId);
   }
 
   createConsumer(streamName, timeout) {
     let mainStreamConsumer = this._mainStream.createConsumer(timeout);
+
     let consumerNext = mainStreamConsumer.next;
     mainStreamConsumer.next = async function () {
       while (true) {
         let packet = await consumerNext.apply(this, arguments);
         if (packet.value) {
           if (
-            packet.value.consumerId ||
-            packet.value.streamName === streamName
+            packet.value.stream === streamName ||
+            packet.value.consumerId === this.id
           ) {
             return packet.value.data;
           }
@@ -126,12 +132,48 @@ class StreamDemux {
         }
       }
     };
+
     let consumerGetStats = mainStreamConsumer.getStats;
     mainStreamConsumer.getStats = function () {
       let stats = consumerGetStats.apply(this, arguments);
-      stats.streamName = streamName;
+      stats.stream = streamName;
       return stats;
     };
+
+    let consumerApplyBackpressure = mainStreamConsumer.applyBackpressure;
+    mainStreamConsumer.applyBackpressure = function (packet) {
+      if (packet.value) {
+        if (
+          packet.value.stream === streamName ||
+          packet.value.consumerId === this.id
+        ) {
+          consumerApplyBackpressure.apply(this, arguments);
+
+          return;
+        }
+      }
+      if (packet.done) {
+        consumerApplyBackpressure.apply(this, arguments);
+      }
+    };
+
+    let consumerReleaseBackpressure = mainStreamConsumer.releaseBackpressure;
+    mainStreamConsumer.releaseBackpressure = function (packet) {
+      if (packet.value) {
+        if (
+          packet.value.stream === streamName ||
+          packet.value.consumerId === this.id
+        ) {
+          consumerReleaseBackpressure.apply(this, arguments);
+
+          return;
+        }
+      }
+      if (packet.done) {
+        consumerReleaseBackpressure.apply(this, arguments);
+      }
+    };
+
     return mainStreamConsumer;
   }
 

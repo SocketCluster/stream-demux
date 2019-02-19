@@ -120,7 +120,7 @@ describe('StreamDemux', () => {
     let receivedPackets = [];
     let consumer = demux.stream('hello').createConsumer();
 
-    assert.equal(consumer.backpressure, 0);
+    assert.equal(consumer.getBackpressure(), 0);
 
     while (true) {
       let packet = await consumer.next();
@@ -405,7 +405,7 @@ describe('StreamDemux', () => {
     assert.notEqual(consumerStats, null);
     assert.equal(consumerStats.id, consumer.id);
     assert.equal(consumerStats.backpressure, 11);
-    assert.equal(consumerStats.backpressure, consumer.backpressure);
+    assert.equal(consumerStats.backpressure, consumer.getBackpressure());
 
     consumer.return();
 
@@ -414,72 +414,389 @@ describe('StreamDemux', () => {
   });
 
   it('should support getConsumerStatsList method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
 
+    for (let i = 0; i < 10; i++) {
+      demux.write('hello', 'world' + i);
+    }
+
+    let consumerB = demux.stream('hello').createConsumer();
+
+    demux.write('hello', 123);
+    demux.close('hello', 'hi');
+
+    let consumerStatsList = demux.getConsumerStatsList('hello');
+    assert.equal(consumerStatsList.length, 2);
+    assert.equal(consumerStatsList[0].id, consumerA.id);
+    assert.equal(consumerStatsList[0].backpressure, 12);
+    assert.equal(consumerStatsList[0].backpressure, consumerA.getBackpressure());
+    assert.equal(consumerStatsList[1].id, consumerB.id);
+    assert.equal(consumerStatsList[1].backpressure, 2);
+    assert.equal(consumerStatsList[1].backpressure, consumerB.getBackpressure());
+
+    consumerStatsList = demux.getConsumerStatsList('bar');
+    assert.equal(consumerStatsList.length, 0);
+
+    consumerA.return();
+    consumerB.return();
   });
 
   it('should support getConsumerStatsListAll method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
 
+    for (let i = 0; i < 10; i++) {
+      demux.write('hello', 'world' + i);
+    }
+
+    let consumerB = demux.stream('hello').createConsumer();
+    let consumerC = demux.stream('foo').createConsumer();
+
+    demux.write('hello', 123);
+    demux.close('hello', 'hi');
+
+    let consumerStatsList = demux.getConsumerStatsListAll();
+    assert.equal(consumerStatsList.length, 3);
+    assert.equal(consumerStatsList[0].id, consumerA.id);
+    assert.equal(consumerStatsList[0].backpressure, 12);
+    assert.equal(consumerStatsList[0].backpressure, consumerA.getBackpressure());
+    assert.equal(consumerStatsList[1].id, consumerB.id);
+    assert.equal(consumerStatsList[1].backpressure, 2);
+    assert.equal(consumerStatsList[1].backpressure, consumerB.getBackpressure());
+    assert.equal(consumerStatsList[2].id, consumerC.id);
+    assert.equal(consumerStatsList[2].backpressure, 0);
+    assert.equal(consumerStatsList[2].backpressure, consumerC.getBackpressure());
+
+    consumerA.return();
+    consumerB.return();
+    consumerC.return();
+
+    consumerStatsList = demux.getConsumerStatsListAll();
+    assert.equal(consumerStatsList.length, 0);
   });
 
   it('should support kill method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hello').createConsumer();
 
+    for (let i = 0; i < 10; i++) {
+      demux.write('hello', 'world' + i);
+    }
+
+    let receivedPackets = [];
+
+    (async () => {
+      while (true) {
+        let packet = await consumerA.next();
+        receivedPackets.push(packet);
+        if (packet.done) break;
+        await wait(30);
+      }
+    })();
+
+    await wait(80);
+
+    demux.kill('hello', 'end');
+
+    await wait(50);
+
+    assert.equal(receivedPackets.length, 4);
+    assert.equal(receivedPackets[0].value, 'world0');
+    assert.equal(receivedPackets[1].value, 'world1');
+    assert.equal(receivedPackets[2].value, 'world2');
+    assert.equal(receivedPackets[3].done, true);
+    assert.equal(receivedPackets[3].value, 'end');
+    assert.equal(consumerA.getBackpressure(), 0);
+    assert.equal(consumerB.getBackpressure(), 0);
   });
 
   it('should support killAll method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hello').createConsumer();
+    let consumerC = demux.stream('hi').createConsumer();
 
+    for (let i = 0; i < 10; i++) {
+      demux.write('hello', 'world' + i);
+      demux.write('hi', 'world' + i);
+    }
+
+    let receivedPacketsA = [];
+    let receivedPacketsC = [];
+
+    (async () => {
+      while (true) {
+        let packet = await consumerA.next();
+        receivedPacketsA.push(packet);
+        if (packet.done) break;
+        await wait(30);
+      }
+    })();
+    (async () => {
+      while (true) {
+        let packet = await consumerC.next();
+        receivedPacketsC.push(packet);
+        if (packet.done) break;
+        await wait(30);
+      }
+    })();
+
+    await wait(80);
+    demux.killAll('bar');
+    await wait(50);
+
+    assert.equal(receivedPacketsA.length, 4);
+    assert.equal(receivedPacketsA[0].value, 'world0');
+    assert.equal(receivedPacketsA[1].value, 'world1');
+    assert.equal(receivedPacketsA[2].value, 'world2');
+    assert.equal(receivedPacketsA[3].done, true);
+    assert.equal(receivedPacketsA[3].value, 'bar');
+    assert.equal(receivedPacketsC.length, 4);
+    assert.equal(receivedPacketsC[0].value, 'world0');
+    assert.equal(receivedPacketsC[1].value, 'world1');
+    assert.equal(receivedPacketsC[2].value, 'world2');
+    assert.equal(receivedPacketsC[3].done, true);
+    assert.equal(receivedPacketsC[3].value, 'bar');
+    assert.equal(consumerA.getBackpressure(), 0);
+    assert.equal(consumerB.getBackpressure(), 0);
   });
 
   it('should support killConsumer method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hello').createConsumer();
 
+    for (let i = 0; i < 10; i++) {
+      demux.write('hello', 'world' + i);
+    }
+
+    let receivedPacketsA = [];
+    let receivedPacketsB = [];
+
+    (async () => {
+      while (true) {
+        let packet = await consumerA.next();
+        receivedPacketsA.push(packet);
+        if (packet.done) break;
+        await wait(30);
+      }
+    })();
+
+    (async () => {
+      while (true) {
+        let packet = await consumerB.next();
+        receivedPacketsB.push(packet);
+        if (packet.done) break;
+        await wait(30);
+      }
+    })();
+
+    await wait(80);
+
+    demux.killConsumer(consumerA.id, 'the end');
+
+    await wait(350);
+
+    assert.equal(receivedPacketsA.length, 4);
+    assert.equal(receivedPacketsA[0].value, 'world0');
+    assert.equal(receivedPacketsA[1].value, 'world1');
+    assert.equal(receivedPacketsA[2].value, 'world2');
+    assert.equal(receivedPacketsA[3].done, true);
+    assert.equal(receivedPacketsA[3].value, 'the end');
+
+    assert.equal(receivedPacketsB.length, 10);
+    assert.equal(receivedPacketsB[0].value, 'world0');
+    assert.equal(receivedPacketsB[1].value, 'world1');
+    assert.equal(receivedPacketsB[9].value, 'world9');
+
+    assert.equal(consumerA.getBackpressure(), 0);
+    assert.equal(consumerB.getBackpressure(), 0);
   });
 
   it('should support getBackpressure method', async () => {
+    let consumer = demux.stream('hello').createConsumer();
 
+    demux.write('hello', 'world0');
+    demux.write('hello', 'world1');
+
+    assert.equal(demux.getBackpressure('hello'), 2);
+
+    demux.write('hello', 'world2');
+    demux.write('hello', 'world3');
+
+    assert.equal(demux.getBackpressure('hello'), 4);
+
+    demux.kill('hello');
+
+    assert.equal(demux.getBackpressure('hello'), 0);
+  });
+
+  it('should support getBackpressureAll method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hi').createConsumer();
+
+    demux.write('hello', 'world0');
+    demux.write('hello', 'world1');
+
+    assert.equal(demux.getBackpressureAll(), 2);
+
+    demux.write('hi', 'message');
+    demux.write('hi', 'message');
+    demux.write('hi', 'message');
+    demux.write('hi', 'message');
+
+    assert.equal(demux.getBackpressureAll(), 4);
+
+    demux.kill('hi');
+
+    assert.equal(demux.getBackpressureAll(), 2);
+
+    demux.kill('hello');
+
+    assert.equal(demux.getBackpressureAll(), 0);
   });
 
   it('should support getConsumerBackpressure method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hi').createConsumer();
 
+    demux.write('hello', 'world0');
+    demux.write('hello', 'world1');
+
+    demux.write('hi', 'message');
+    demux.write('hi', 'message');
+    demux.write('hi', 'message');
+    demux.write('hi', 'message');
+
+    assert.equal(demux.getConsumerBackpressure(consumerA.id), 2);
+    assert.equal(demux.getConsumerBackpressure(consumerB.id), 4);
+
+    demux.kill('hi');
+
+    assert.equal(demux.getConsumerBackpressure(consumerA.id), 2);
+    assert.equal(demux.getConsumerBackpressure(consumerB.id), 0);
+
+    demux.kill('hello');
+
+    assert.equal(demux.getConsumerBackpressure(consumerA.id), 0);
+    assert.equal(demux.getConsumerBackpressure(consumerB.id), 0);
   });
 
   it('should support hasConsumer method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hi').createConsumer();
 
+    assert.equal(demux.hasConsumer('hello', 123), false);
+    assert.equal(demux.hasConsumer('hello', consumerA.id), true);
+    assert.equal(demux.hasConsumer('hi', consumerB.id), true);
+    assert.equal(demux.hasConsumer('hello', consumerB.id), false);
+    assert.equal(demux.hasConsumer('hi', consumerA.id), false);
+  });
+
+  it('should support hasConsumerAll method', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hi').createConsumer();
+
+    assert.equal(demux.hasConsumerAll(123), false);
+    assert.equal(demux.hasConsumerAll(consumerA.id), true);
+    assert.equal(demux.hasConsumerAll(consumerB.id), true);
   });
 
   describe('DemuxedConsumableStream', () => {
-    it('should support writeToConsumer method', async () => {
+    it('should support hasConsumer method', async () => {
+      let stream = demux.stream('hello');
+      let consumerA = stream.createConsumer();
+      let consumerB = demux.stream('hi').createConsumer();
 
-    });
-
-    it('should support closeConsumer method', async () => {
-
+      assert.equal(stream.hasConsumer(consumerA.id), true);
+      assert.equal(stream.hasConsumer(consumerB.id), false);
+      assert.equal(stream.hasConsumer(123), false);
     });
 
     it('should support getConsumerStats method', async () => {
+      let stream = demux.stream('hello');
+      let consumerA = stream.createConsumer();
+      let consumerB = demux.stream('hi').createConsumer();
 
+      let stats = stream.getConsumerStats(consumerA.id);
+      assert.notEqual(stats, null);
+      assert.equal(stats.id, consumerA.id);
+      assert.equal(stats.stream, 'hello');
+
+      stats = stream.getConsumerStats(consumerB.id);
+      assert.equal(stats, undefined);
     });
 
     it('should support getConsumerStatsList method', async () => {
+      let stream = demux.stream('hello');
+      let consumerA = stream.createConsumer();
+      let consumerB = demux.stream('hi').createConsumer();
+      let consumerC = stream.createConsumer();
 
-    });
-
-    it('should support kill method', async () => {
-
-    });
-
-    it('should support killConsumer method', async () => {
-
+      let statsList = stream.getConsumerStatsList();
+      assert.equal(statsList.length, 2);
+      assert.equal(statsList[0].id, consumerA.id);
+      assert.equal(statsList[1].id, consumerC.id);
     });
 
     it('should support getBackpressure method', async () => {
+      let stream = demux.stream('hello');
+      let consumerA = stream.createConsumer();
 
+      demux.write('hello', 1);
+
+      assert.equal(stream.getBackpressure(), 1);
+
+      demux.write('hello', 2);
+      demux.write('hello', 3);
+      demux.close('hello', 'done');
+
+      assert.equal(stream.getBackpressure(), 4);
+
+      let expectedBackpressure = 3;
+      while (true) {
+        let packet = await consumerA.next();
+        assert.equal(stream.getBackpressure(), expectedBackpressure);
+        expectedBackpressure--;
+        if (packet.done) break;
+      }
+
+      assert.equal(stream.getBackpressure(), 0);
     });
 
     it('should support getConsumerBackpressure method', async () => {
+      let streamA = demux.stream('hello');
+      let streamB = demux.stream('hi');
+      let consumerA = streamA.createConsumer();
+      let consumerB = demux.stream('hi').createConsumer();
 
-    });
+      demux.write('hello', 1);
+      demux.write('hi', 1);
+      demux.write('hi', 2);
 
-    it('should support hasConsumer method', async () => {
+      assert.equal(streamA.getConsumerBackpressure(consumerA.id), 1);
+      assert.equal(streamB.getConsumerBackpressure(consumerB.id), 2);
 
+      demux.write('hello', 2);
+      demux.write('hello', 3);
+      demux.close('hello', 'done');
+
+      assert.equal(streamA.getConsumerBackpressure(consumerA.id), 4);
+
+      let expectedBackpressure = 3;
+      while (true) {
+        let packet = await consumerA.next();
+        assert.equal(streamA.getConsumerBackpressure(consumerA.id), expectedBackpressure);
+        expectedBackpressure--;
+        if (packet.done) break;
+      }
+
+      assert.equal(streamA.getConsumerBackpressure(consumerA.id), 0);
+
+      // Non-existent consumer should have 0 backpressure.
+      assert.equal(streamA.getConsumerBackpressure(123), 0);
+
+      assert.equal(streamB.getConsumerBackpressure(consumerB.id), 2);
+
+      // The consumerB consumer does not exist on streamA, therefore backpressure will be 0.
+      assert.equal(streamA.getConsumerBackpressure(consumerB.id), 0);
     });
   });
 });

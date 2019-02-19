@@ -7,15 +7,14 @@ class DemuxedConsumableStream extends ConsumableStream {
     this._streamDemux = streamDemux;
   }
 
-  writeToConsumer(consumerId, value) {
-    this._streamDemux.writeToConsumer(this.name, consumerId, value);
-  }
-
-  closeConsumer(consumerId, value) {
-    this._streamDemux.closeConsumer(this.name, consumerId, value);
+  hasConsumer(consumerId) {
+    return this._streamDemux.hasConsumer(this.name, consumerId);
   }
 
   getConsumerStats(consumerId) {
+    if (!this.hasConsumer(consumerId)) {
+      return undefined;
+    }
     return this._streamDemux.getConsumerStats(consumerId);
   }
 
@@ -23,24 +22,15 @@ class DemuxedConsumableStream extends ConsumableStream {
     return this._streamDemux.getConsumerStatsList(this.name);
   }
 
-  kill(value) {
-    this._streamDemux.kill(this.name, value);
-  }
-
-  killConsumer(consumerId, value) {
-    this._streamDemux.killConsumer(consumerId, value);
-  }
-
-  getBackpressure(streamName) {
+  getBackpressure() {
     return this._streamDemux.getBackpressure(this.name);
   }
 
   getConsumerBackpressure(consumerId) {
+    if (!this.hasConsumer(consumerId)) {
+      return 0;
+    }
     return this._streamDemux.getConsumerBackpressure(consumerId);
-  }
-
-  hasConsumer(consumerId) {
-    this._streamDemux.hasConsumer(consumerId);
   }
 
   createConsumer(timeout) {

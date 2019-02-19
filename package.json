@@ -29,6 +29,6 @@
   },
   "dependencies": {
     "consumable-stream": "^1.0.0",
-    "writable-consumable-stream": "^1.0.3"
+    "writable-consumable-stream": "^1.1.1"
   }
 }
