@@ -18,7 +18,7 @@ class StreamDemux {
 
   close(streamName, value) {
     this._mainStream.write({
-      streamName,
+      streamName, // TODO 2
       data: {
         value,
         done: true
@@ -32,7 +32,7 @@ class StreamDemux {
 
   writeToConsumer(consumerId, value) {
     this._mainStream.writeToConsumer(consumerId, {
-      consumerId,
+      consumerId, // TODO 2
       data: {
         value,
         done: false
@@ -61,7 +61,7 @@ class StreamDemux {
     });
   }
 
-  getConsumerStatsListAll(streamName) {
+  getConsumerStatsListAll() {
     return this._mainStream.getConsumerStatsList();
   }
 
@@ -109,14 +109,15 @@ class StreamDemux {
 
   createConsumer(streamName, timeout) {
     let mainStreamConsumer = this._mainStream.createConsumer(timeout);
+
     let consumerNext = mainStreamConsumer.next;
     mainStreamConsumer.next = async function () {
       while (true) {
         let packet = await consumerNext.apply(this, arguments);
         if (packet.value) {
           if (
-            packet.value.consumerId ||
-            packet.value.streamName === streamName
+            packet.value.streamName === streamName ||
+            packet.value.consumerId === this.id
           ) {
             return packet.value.data;
           }
@@ -126,12 +127,48 @@ class StreamDemux {
         }
       }
     };
+
     let consumerGetStats = mainStreamConsumer.getStats;
     mainStreamConsumer.getStats = function () {
       let stats = consumerGetStats.apply(this, arguments);
       stats.streamName = streamName;
       return stats;
     };
+
+    let consumerApplyBackpressure = mainStreamConsumer.applyBackpressure;
+    mainStreamConsumer.applyBackpressure = function (packet) {
+      if (packet.value) {
+        if (
+          packet.value.streamName === streamName ||
+          packet.value.consumerId === this.id
+        ) {
+          consumerApplyBackpressure.apply(this, arguments);
+
+          return;
+        }
+      }
+      if (packet.done) {
+        consumerApplyBackpressure.apply(this, arguments);
+      }
+    };
+
+    let consumerReleaseBackpressure = mainStreamConsumer.applyBackpressure;
+    mainStreamConsumer.releaseBackpressure = function (packet) {
+      if (packet.value) {
+        if (
+          packet.value.streamName === streamName ||
+          packet.value.consumerId === this.id
+        ) {
+          consumerReleaseBackpressure.apply(this, arguments);
+
+          return;
+        }
+      }
+      if (packet.done) {
+        consumerReleaseBackpressure.apply(this, arguments);
+      }
+    };
+
     return mainStreamConsumer;
   }
 
