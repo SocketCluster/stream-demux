@@ -1,6 +1,6 @@
 {
   "name": "stream-demux",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "A consumable stream demultiplexer.",
   "main": "index.js",
   "scripts": {
