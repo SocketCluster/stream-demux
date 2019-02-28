@@ -124,6 +124,9 @@ class StreamDemux {
             packet.value.stream === streamName ||
             packet.value.consumerId === this.id
           ) {
+            if (packet.value.data.done) {
+              this.return();
+            }
             return packet.value.data;
           }
         }
