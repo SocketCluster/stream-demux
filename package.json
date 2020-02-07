@@ -28,7 +28,7 @@
     "mocha": "^5.0.5"
   },
   "dependencies": {
-    "consumable-stream": "^1.0.0",
-    "writable-consumable-stream": "^1.1.1"
+    "consumable-stream": "^2.0.0",
+    "writable-consumable-stream": "^2.0.0"
   }
 }
