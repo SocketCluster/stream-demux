@@ -43,7 +43,7 @@ let demux = new StreamDemux();
   // the same time.
   // Note that you can optionally pass a number n to the
   // createConsumer(n) method to force the iteration to
-  // timeout after n milliseconds of innactivity.
+  // timeout after n milliseconds of inactivity.
   let consumer = demux.stream('def').createConsumer();
   while (true) {
     let packet = await consumer.next();
