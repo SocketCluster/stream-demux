@@ -112,6 +112,14 @@ class StreamDemux {
     return this._mainStream.hasConsumer(consumerId);
   }
 
+  getConsumerCount(streamName) {
+    return this.getConsumerStatsList(streamName).length;
+  }
+
+  getConsumerCountAll() {
+    return this.getConsumerStatsListAll().length;
+  }
+
   createConsumer(streamName, timeout) {
     let mainStreamConsumer = this._mainStream.createConsumer(timeout);
 
