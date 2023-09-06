@@ -144,6 +144,16 @@ class StreamDemux {
       }
     };
 
+    let consumerClearActiveTimeout = mainStreamConsumer.clearActiveTimeout;
+    mainStreamConsumer.clearActiveTimeout = function (packet) {
+      let { value, done } = packet;
+      if (done) {
+        consumerClearActiveTimeout.apply(this, arguments);
+      } else if (value && value.stream === streamName) {
+        consumerClearActiveTimeout.apply(this, arguments);
+      }
+    };
+
     let consumerGetStats = mainStreamConsumer.getStats;
     mainStreamConsumer.getStats = function () {
       let stats = consumerGetStats.apply(this, arguments);

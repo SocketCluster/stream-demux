@@ -296,6 +296,74 @@ describe('StreamDemux', () => {
     assert.equal(packet, null);
   });
 
+  it('should prevent stream.once() timeout from being reset when writing to other streams', async () => {
+    (async () => {
+      for (let i = 0; i < 15; i++) {
+        await wait(20);
+        demux.write('hi', 'test');
+      }
+    })();
+
+    let substream = demux.stream('hello');
+
+    let packet;
+    let error;
+    try {
+      packet = await substream.once(200);
+    } catch (err) {
+      error = err;
+    }
+
+    assert.notEqual(error, null);
+    assert.equal(error.name, 'TimeoutError');
+    assert.equal(packet, null);
+  });
+
+  it('should prevent stream.once() timeout from being reset when killing other streams', async () => {
+    (async () => {
+      for (let i = 0; i < 15; i++) {
+        await wait(20);
+        demux.kill('hi' + i, 'test');
+      }
+    })();
+
+    let substream = demux.stream('hello');
+
+    let packet;
+    let error;
+    try {
+      packet = await substream.once(200);
+    } catch (err) {
+      error = err;
+    }
+
+    assert.notEqual(error, null);
+    assert.equal(error.name, 'TimeoutError');
+    assert.equal(packet, null);
+  });
+
+  it('should support stream.once() timeout after killing the stream', async () => {
+    (async () => {
+      await wait(20);
+      demux.kill('hello', 'test');
+    })();
+
+    let substream = demux.stream('hello');
+
+    let start = Date.now();
+
+    let packet;
+    let error;
+    try {
+      packet = await substream.once(200);
+    } catch (err) {
+      error = err;
+    }
+    assert.notEqual(error, null);
+    assert.equal(error.name, 'TimeoutError');
+    assert.equal(packet, null);
+  });
+
   it('should support stream.next() method with close command', async () => {
     (async () => {
       for (let i = 0; i < 3; i++) {
