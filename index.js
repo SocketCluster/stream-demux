@@ -1,5 +1,6 @@
 const WritableConsumableStream = require('writable-consumable-stream');
 const DemuxedConsumableStream = require('./demuxed-consumable-stream');
+const StreamConsumer = require('./stream-consumer');
 
 class StreamDemux {
   constructor() {
@@ -121,12 +122,24 @@ class StreamDemux {
   }
 
   createConsumer(streamName, timeout) {
+    // TODO 000
+    return new StreamConsumer(this._mainStream, this._mainStream.nextConsumerId++, this._mainStream._tailNode, streamName, timeout);
+    return this._mainStream.createConsumer(timeout, streamName);
+
     let mainStreamConsumer = this._mainStream.createConsumer(timeout);
 
     let consumerNext = mainStreamConsumer.next;
     mainStreamConsumer.next = async function () {
+      let timeoutRemaining = timeout;
       while (true) {
-        let packet = await consumerNext.apply(this, arguments);
+        let startTime = Date.now();
+        let packet = await consumerNext.call(this, timeoutRemaining);
+        let endTime = Date.now();
+        timeoutRemaining -= endTime - startTime;
+        if (timeoutRemaining < 0) {
+          timeoutRemaining = 0;
+        }
+        // let packet = await consumerNext.apply(this, arguments);// TODO 000
         if (packet.value) {
           if (
             packet.value.stream === streamName ||

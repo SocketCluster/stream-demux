@@ -48,12 +48,14 @@ describe('StreamDemux', () => {
       (async () => {
         let substream = demux.stream('hello');
         for await (let packet of substream) {
+          console.log('HELLO', packet);
           receivedHelloPackets.push(packet);
         }
       })(),
       (async () => {
         let substream = demux.stream('abc');
         for await (let packet of substream) {
+          console.log('ABC', packet);
           receivedAbcPackets.push(packet);
         }
       })()
