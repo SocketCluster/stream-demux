@@ -5,8 +5,8 @@ class StreamConsumer {
     this.currentNode = startNode;
     this.timeout = timeout;
     this.isAlive = true;
-    this.mainStream = mainStream;
-    this.mainStream.setConsumer(this.id, this);
+    this._mainStream = mainStream;
+    this._mainStream.setConsumer(this.id, this);
     this.streamName = streamName;
   }
 
@@ -44,7 +44,7 @@ class StreamConsumer {
   }
 
   write(packet) {
-    if (packet.value.stream !== this.streamName) return;
+    if (!packet.done && packet.value.stream !== this.streamName) return;
     if (this._timeoutId !== undefined) {
       this.clearActiveTimeout(packet);
     }
@@ -71,7 +71,7 @@ class StreamConsumer {
   _destroy() {
     this.isAlive = false;
     this._resetBackpressure();
-    this.mainStream.removeConsumer(this.id);
+    this._mainStream.removeConsumer(this.id);
   }
 
   async _waitForNextItem(timeout) {
@@ -96,7 +96,7 @@ class StreamConsumer {
   }
 
   async next() {
-    this.mainStream.setConsumer(this.id, this);
+    this._mainStream.setConsumer(this.id, this);
 
     while (true) {
       if (!this.currentNode.next) {
@@ -115,20 +115,30 @@ class StreamConsumer {
         return killPacket;
       }
 
-      this.currentNode = this.currentNode.next;
+      // Skip over nodes which belong to different streams.
+      while (
+        this.currentNode.next?.data?.value &&
+        this.currentNode.next.data.value.stream !== this.streamName &&
+        this.currentNode.next.consumerId !== this.id
+      ) {
+        this.currentNode = this.currentNode.next;
+      }
 
-      if (this.currentNode.data.value.stream !== this.streamName) {
+      if (!this.currentNode.next) {
         continue;
       }
+      this.currentNode = this.currentNode.next;
 
       this.releaseBackpressure(this.currentNode.data);
 
-      if (this.currentNode.consumerId && this.currentNode.consumerId !== this.id) {
-        continue;
-      }
-      // console.log(555, this.currentNode.data.value.data.done);
-      if (this.currentNode.data.value.data.done) {
+      if (this.currentNode.data?.value?.data?.done) {
         this._destroy();
+        return this.currentNode.data.value.data;
+      }
+
+      if (this.currentNode.data.done) {
+        this._destroy();
+        return this.currentNode.data;
       }
 
       return this.currentNode.data.value.data;

@@ -48,14 +48,12 @@ describe('StreamDemux', () => {
       (async () => {
         let substream = demux.stream('hello');
         for await (let packet of substream) {
-          console.log('HELLO', packet);
           receivedHelloPackets.push(packet);
         }
       })(),
       (async () => {
         let substream = demux.stream('abc');
         for await (let packet of substream) {
-          console.log('ABC', packet);
           receivedAbcPackets.push(packet);
         }
       })()
@@ -413,6 +411,7 @@ describe('StreamDemux', () => {
     let consumer = demux.stream('hello').createConsumer();
 
     (async () => {
+      await wait(50);
       for (let i = 0; i < 10; i++) {
         await wait(10);
         demux.writeToConsumer(consumer.id, 'world' + i);
