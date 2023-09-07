@@ -122,95 +122,17 @@ class StreamDemux {
   }
 
   createConsumer(streamName, timeout) {
-    // TODO 000
-    return new StreamConsumer(this._mainStream, this._mainStream.nextConsumerId++, this._mainStream._tailNode, streamName, timeout);
-    return this._mainStream.createConsumer(timeout, streamName);
-
-    let mainStreamConsumer = this._mainStream.createConsumer(timeout);
-
-    let consumerNext = mainStreamConsumer.next;
-    mainStreamConsumer.next = async function () {
-      let timeoutRemaining = timeout;
-      while (true) {
-        let startTime = Date.now();
-        let packet = await consumerNext.call(this, timeoutRemaining);
-        let endTime = Date.now();
-        timeoutRemaining -= endTime - startTime;
-        if (timeoutRemaining < 0) {
-          timeoutRemaining = 0;
-        }
-        // let packet = await consumerNext.apply(this, arguments);// TODO 000
-        if (packet.value) {
-          if (
-            packet.value.stream === streamName ||
-            packet.value.consumerId === this.id
-          ) {
-            if (packet.value.data.done) {
-              this.return();
-            }
-            return packet.value.data;
-          }
-        }
-        if (packet.done) {
-          return packet;
-        }
-      }
-    };
-
-    let consumerClearActiveTimeout = mainStreamConsumer.clearActiveTimeout;
-    mainStreamConsumer.clearActiveTimeout = function (packet) {
-      let { value, done } = packet;
-      if (done) {
-        consumerClearActiveTimeout.apply(this, arguments);
-      } else if (value && value.stream === streamName) {
-        consumerClearActiveTimeout.apply(this, arguments);
-      }
-    };
-
-    let consumerGetStats = mainStreamConsumer.getStats;
-    mainStreamConsumer.getStats = function () {
-      let stats = consumerGetStats.apply(this, arguments);
-      stats.stream = streamName;
-      return stats;
-    };
-
-    let consumerApplyBackpressure = mainStreamConsumer.applyBackpressure;
-    mainStreamConsumer.applyBackpressure = function (packet) {
-      if (packet.value) {
-        if (
-          packet.value.stream === streamName ||
-          packet.value.consumerId === this.id
-        ) {
-          consumerApplyBackpressure.apply(this, arguments);
-
-          return;
-        }
-      }
-      if (packet.done) {
-        consumerApplyBackpressure.apply(this, arguments);
-      }
-    };
-
-    let consumerReleaseBackpressure = mainStreamConsumer.releaseBackpressure;
-    mainStreamConsumer.releaseBackpressure = function (packet) {
-      if (packet.value) {
-        if (
-          packet.value.stream === streamName ||
-          packet.value.consumerId === this.id
-        ) {
-          consumerReleaseBackpressure.apply(this, arguments);
-
-          return;
-        }
-      }
-      if (packet.done) {
-        consumerReleaseBackpressure.apply(this, arguments);
-      }
-    };
-
-    return mainStreamConsumer;
+    return new StreamConsumer(
+      this._mainStream,
+      this._mainStream.nextConsumerId++,
+      this._mainStream.tailNode,
+      streamName,
+      timeout
+    );
   }
 
+  // Unlike individual consumers, consumable streams support being iterated
+  // over by multiple for-await-of loops in parallel.
   stream(streamName) {
     return new DemuxedConsumableStream(this, streamName);
   }
