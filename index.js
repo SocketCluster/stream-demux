@@ -121,13 +121,14 @@ class StreamDemux {
     return this.getConsumerStatsListAll().length;
   }
 
-  createConsumer(streamName, timeout) {
+  createConsumer(streamName, timeout, usabilityMode) {
     return new StreamConsumer(
       this._mainStream,
       this._mainStream.nextConsumerId++,
       this._mainStream.tailNode,
       streamName,
-      timeout
+      timeout,
+      usabilityMode
     );
   }
 

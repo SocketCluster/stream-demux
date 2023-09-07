@@ -1,5 +1,5 @@
 class StreamConsumer {
-  constructor(mainStream, id, startNode, streamName, timeout) {
+  constructor(mainStream, id, startNode, streamName, timeout, usabilityMode) {
     this.id = id;
     this._backpressure = 0;
     this.currentNode = startNode;
@@ -8,6 +8,7 @@ class StreamConsumer {
     this._mainStream = mainStream;
     this._mainStream.setConsumer(this.id, this);
     this.streamName = streamName;
+    this.usabilityMode = !!usabilityMode;
   }
 
   getStats() {
@@ -44,11 +45,12 @@ class StreamConsumer {
   }
 
   write(packet) {
-    if (!packet.done && packet.value.stream !== this.streamName) return;
-    if (this._timeoutId !== undefined) {
-      this.clearActiveTimeout(packet);
+    if (packet.done || packet.value.stream === this.streamName) {
+      if (this._timeoutId !== undefined) {
+        this.clearActiveTimeout(packet);
+      }
+      this.applyBackpressure(packet);
     }
-    this.applyBackpressure(packet);
     if (this._resolve) {
       this._resolve();
       delete this._resolve;
@@ -78,7 +80,7 @@ class StreamConsumer {
     return new Promise((resolve, reject) => {
       this._resolve = resolve;
       let timeoutId;
-      if (timeout !== undefined) {
+      if (timeout != null) {
         // Create the error object in the outer scope in order
         // to get the full stack trace.
         let error = new Error('Stream consumer iteration timed out');
@@ -119,14 +121,17 @@ class StreamConsumer {
       while (
         this.currentNode.next?.data?.value &&
         this.currentNode.next.data.value.stream !== this.streamName &&
-        this.currentNode.next.consumerId !== this.id
+        this.currentNode.next.consumerId !== this.id &&
+        !this.currentNode.next.data.done
       ) {
         this.currentNode = this.currentNode.next;
+        this.usabilityMode && await wait(0);
       }
 
       if (!this.currentNode.next) {
         continue;
       }
+
       this.currentNode = this.currentNode.next;
 
       this.releaseBackpressure(this.currentNode.data);
