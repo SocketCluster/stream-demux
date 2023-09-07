@@ -134,8 +134,8 @@ class StreamDemux {
 
   // Unlike individual consumers, consumable streams support being iterated
   // over by multiple for-await-of loops in parallel.
-  stream(streamName) {
-    return new DemuxedConsumableStream(this, streamName);
+  stream(streamName, usabilityMode) {
+    return new DemuxedConsumableStream(this, streamName, usabilityMode);
   }
 }
 
