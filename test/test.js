@@ -280,6 +280,53 @@ describe('StreamDemux', () => {
     assert.equal(otherReceivedPackets.length, 100);
   });
 
+  it('should support writing an arbitrarily large number of times within the same call stack', async () => {
+    (async () => {
+      await wait(50);
+      for (let i = 0; i < 100; i++) {
+        demux.write('hello', 'world' + i);
+      }
+      demux.close('hello');
+    })();
+
+    let substream = demux.stream('hello');
+
+    let receivedPackets = [];
+    for await (let packet of substream) {
+      receivedPackets.push(packet);
+      await wait(10);
+    }
+
+    assert.equal(receivedPackets.length, 100);
+  });
+
+  it('should support writing an arbitrarily large number of times within the same call stack with multiple concurrent consumers', async () => {
+    (async () => {
+      await wait(50);
+      for (let i = 0; i < 50; i++) {
+        demux.write('other', 'message' + i);
+      }
+      demux.close('other');
+    })();
+
+    let otherSubstream = demux.stream('other');
+
+    let receivedPackets = [];
+    (async () => {
+      for await (let otherPacket of otherSubstream) {
+        await wait(10);
+        receivedPackets.push(otherPacket);
+      }
+    })();
+
+    for await (let otherPacket of otherSubstream) {
+      await wait(20);
+      receivedPackets.push(otherPacket);
+    }
+
+    assert.equal(receivedPackets.length, 100);
+  });
+
   it('should support the stream.once() method', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
