@@ -231,6 +231,55 @@ describe('StreamDemux', () => {
     assert.equal(receivedPacketsB.length, 10);
   });
 
+  it('should support writing multiple times within the same call stack and across multiple streams', async () => {
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(20);
+        for (let j = 0; j < 10; j++) {
+          demux.write('hello', 'world' + i + '-' + j);
+        }
+      }
+      demux.close('hello');
+    })();
+
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(10);
+        for (let j = 0; j < 5; j++) {
+          demux.write('other', 'message' + i + '-' + j);
+        }
+      }
+      demux.close('other');
+    })();
+
+    let substream = demux.stream('hello');
+    let otherSubstream = demux.stream('other');
+
+    let otherReceivedPackets = [];
+    (async () => {
+      for await (let otherPacket of otherSubstream) {
+        await wait(10);
+        otherReceivedPackets.push(otherPacket);
+      }
+    })();
+
+    (async () => {
+      for await (let otherPacket of otherSubstream) {
+        await wait(20);
+        otherReceivedPackets.push(otherPacket);
+      }
+    })();
+
+    let receivedPackets = [];
+    for await (let packet of substream) {
+      await wait(20);
+      receivedPackets.push(packet);
+    }
+
+    assert.equal(receivedPackets.length, 100);
+    assert.equal(otherReceivedPackets.length, 100);
+  });
+
   it('should support the stream.once() method', async () => {
     (async () => {
       for (let i = 0; i < 10; i++) {
