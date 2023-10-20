@@ -1,19 +1,14 @@
 const ConsumableStream = require('consumable-stream');
 
 class DemuxedConsumableStream extends ConsumableStream {
-  constructor(streamDemux, name, usabilityMode) {
+  constructor(streamDemux, name) {
     super();
     this._streamDemux = streamDemux;
     this.name = name;
-    this.usabilityMode = !!usabilityMode;
   }
 
   createConsumer(timeout) {
-    return this._streamDemux.createConsumer(
-      this.name,
-      timeout,
-      this.usabilityMode
-    );
+    return this._streamDemux.createConsumer(this.name, timeout);
   }
 }
 

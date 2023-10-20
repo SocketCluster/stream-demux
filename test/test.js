@@ -344,6 +344,8 @@ describe('StreamDemux', () => {
     packet = await substream.once();
     assert.equal(packet, 'world1');
 
+    await wait(1);
+
     packet = await substream.once();
     assert.equal(packet, 'world2');
   });
@@ -406,6 +408,36 @@ describe('StreamDemux', () => {
     let error;
     try {
       packet = await substream.once(200);
+    } catch (err) {
+      error = err;
+    }
+
+    assert.notEqual(error, null);
+    assert.equal(error.name, 'TimeoutError');
+    assert.equal(packet, null);
+  });
+
+  it('should prevent stream timeout from being reset when writing to other streams when iterating over consumer with timeout', async () => {
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        await wait(200);
+        demux.write('foo', 123);
+        await wait(200);
+        demux.write('hello', 'test' + i);
+      }
+      demux.kill('hello');
+    })();
+
+    let consumer = demux.stream('hello').createConsumer(300);
+    let error;
+
+    let packet;
+
+    try {
+      while (true) {
+        packet = await consumer.next();
+        if (packet.done) break;
+      }
     } catch (err) {
       error = err;
     }

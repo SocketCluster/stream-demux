@@ -1,141 +1,166 @@
 const WritableConsumableStream = require('writable-consumable-stream');
 const DemuxedConsumableStream = require('./demuxed-consumable-stream');
-const StreamConsumer = require('./stream-consumer');
 
 class StreamDemux {
   constructor() {
-    this._mainStream = new WritableConsumableStream();
+    this.streams = {};
+    this._nextConsumerId = 1;
+    this.generateConsumerId = () => {
+      return this._nextConsumerId++;
+    };
   }
 
   write(streamName, value) {
-    this._mainStream.write({
-      stream: streamName,
-      data: {
-        value,
-        done: false
-      }
-    });
+    if (this.streams[streamName]) {
+      this.streams[streamName].write(value);
+    }
   }
 
   close(streamName, value) {
-    this._mainStream.write({
-      stream: streamName,
-      data: {
-        value,
-        done: true
-      }
-    });
+    if (this.streams[streamName]) {
+      this.streams[streamName].close(value);
+    }
   }
 
   closeAll(value) {
-    this._mainStream.close(value);
+    for (let stream of Object.values(this.streams)) {
+      stream.close(value);
+    }
   }
 
   writeToConsumer(consumerId, value) {
-    this._mainStream.writeToConsumer(consumerId, {
-      consumerId,
-      data: {
-        value,
-        done: false
+    for (let stream of Object.values(this.streams)) {
+      if (stream.hasConsumer(consumerId)) {
+        return stream.writeToConsumer(consumerId, value);
       }
-    });
+    }
   }
 
   closeConsumer(consumerId, value) {
-    this._mainStream.closeConsumer(consumerId, {
-      consumerId,
-      data: {
-        value,
-        done: true
+    for (let stream of Object.values(this.streams)) {
+      if (stream.hasConsumer(consumerId)) {
+        return stream.closeConsumer(consumerId, value);
       }
-    });
+    }
   }
 
   getConsumerStats(consumerId) {
-    return this._mainStream.getConsumerStats(consumerId);
+    for (let stream of Object.values(this.streams)) {
+      if (stream.hasConsumer(consumerId)) {
+        return stream.getConsumerStats(consumerId);
+      }
+    }
+    return undefined;
   }
 
   getConsumerStatsList(streamName) {
-    let consumerList = this._mainStream.getConsumerStatsList();
-    return consumerList.filter((consumerStats) => {
-      return consumerStats.stream === streamName;
-    });
+    if (this.streams[streamName]) {
+      return this.streams[streamName].getConsumerStatsList();
+    }
+    return [];
   }
 
   getConsumerStatsListAll() {
-    return this._mainStream.getConsumerStatsList();
+    let allStatsList = [];
+    for (let stream of Object.values(this.streams)) {
+      let statsList = stream.getConsumerStatsList();
+      for (let stats of statsList) {
+        allStatsList.push(stats);
+      }
+    }
+    return allStatsList;
   }
 
   kill(streamName, value) {
-    let consumerList = this.getConsumerStatsList(streamName);
-    let len = consumerList.length;
-    for (let i = 0; i < len; i++) {
-      this.killConsumer(consumerList[i].id, value);
+    if (this.streams[streamName]) {
+      this.streams[streamName].kill(value);
     }
   }
 
   killAll(value) {
-    this._mainStream.kill(value);
+    for (let stream of Object.values(this.streams)) {
+      stream.kill(value);
+    }
   }
 
   killConsumer(consumerId, value) {
-    this._mainStream.killConsumer(consumerId, value);
+    for (let stream of Object.values(this.streams)) {
+      if (stream.hasConsumer(consumerId)) {
+        return stream.killConsumer(consumerId, value);
+      }
+    }
   }
 
   getBackpressure(streamName) {
-    let consumerList = this.getConsumerStatsList(streamName);
-    let len = consumerList.length;
-
-    let maxBackpressure = 0;
-    for (let i = 0; i < len; i++) {
-      let consumer = consumerList[i];
-      if (consumer.backpressure > maxBackpressure) {
-        maxBackpressure = consumer.backpressure;
-      }
+    if (this.streams[streamName]) {
+      return this.streams[streamName].getBackpressure();
     }
-    return maxBackpressure;
+    return 0;
   }
 
   getBackpressureAll() {
-    return this._mainStream.getBackpressure();
+    return Object.values(this.streams).reduce(
+      (max, stream) => Math.max(max, stream.getBackpressure()),
+      0
+    );
   }
 
   getConsumerBackpressure(consumerId) {
-    return this._mainStream.getConsumerBackpressure(consumerId);
+    for (let stream of Object.values(this.streams)) {
+      if (stream.hasConsumer(consumerId)) {
+        return stream.getConsumerBackpressure(consumerId);
+      }
+    }
+    return 0;
   }
 
   hasConsumer(streamName, consumerId) {
-    let consumerStats = this._mainStream.getConsumerStats(consumerId);
-    return !!consumerStats && consumerStats.stream === streamName;
+    if (this.streams[streamName]) {
+      return this.streams[streamName].hasConsumer(consumerId);
+    }
+    return false;
   }
 
   hasConsumerAll(consumerId) {
-    return this._mainStream.hasConsumer(consumerId);
+    return Object.values(this.streams).some(stream => stream.hasConsumer(consumerId));
   }
 
   getConsumerCount(streamName) {
-    return this.getConsumerStatsList(streamName).length;
+    if (this.streams[streamName]) {
+      return this.streams[streamName].getConsumerCount();
+    }
+    return 0;
   }
 
   getConsumerCountAll() {
-    return this.getConsumerStatsListAll().length;
+    return Object.values(this.streams).reduce(
+      (sum, stream) => sum + stream.getConsumerCount(),
+      0
+    );
   }
 
-  createConsumer(streamName, timeout, usabilityMode) {
-    return new StreamConsumer(
-      this._mainStream,
-      this._mainStream.nextConsumerId++,
-      this._mainStream.tailNode,
-      streamName,
-      timeout,
-      usabilityMode
-    );
+  createConsumer(streamName, timeout) {
+    if (!this.streams[streamName]) {
+      this.streams[streamName] = new WritableConsumableStream({
+        generateConsumerId: this.generateConsumerId,
+        removeConsumerCallback: () => {
+          if (!this.getConsumerCount(streamName)) {
+            delete this.streams[streamName];
+          }
+        }
+      });
+    }
+    return this.streams[streamName].createConsumer(timeout);
   }
 
   // Unlike individual consumers, consumable streams support being iterated
   // over by multiple for-await-of loops in parallel.
-  stream(streamName, usabilityMode) {
-    return new DemuxedConsumableStream(this, streamName, usabilityMode);
+  stream(streamName) {
+    return new DemuxedConsumableStream(this, streamName);
+  }
+
+  unstream(streamName) {
+    delete this.streams[streamName];
   }
 }
 
