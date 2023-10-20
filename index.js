@@ -45,9 +45,12 @@ class StreamDemux {
   }
 
   getConsumerStats(consumerId) {
-    for (let stream of Object.values(this.streams)) {
+    for (let [streamName, stream] of Object.entries(this.streams)) {
       if (stream.hasConsumer(consumerId)) {
-        return stream.getConsumerStats(consumerId);
+        return {
+          ...stream.getConsumerStats(consumerId),
+          stream: streamName
+        };
       }
     }
     return undefined;
@@ -55,15 +58,24 @@ class StreamDemux {
 
   getConsumerStatsList(streamName) {
     if (this.streams[streamName]) {
-      return this.streams[streamName].getConsumerStatsList();
+      return this.streams[streamName]
+        .getConsumerStatsList()
+        .map(
+          (stats) => {
+            return {
+              ...stats,
+              stream: streamName
+            };
+          }
+        );
     }
     return [];
   }
 
   getConsumerStatsListAll() {
     let allStatsList = [];
-    for (let stream of Object.values(this.streams)) {
-      let statsList = stream.getConsumerStatsList();
+    for (let streamName of Object.keys(this.streams)) {
+      let statsList = this.getConsumerStatsList(streamName);
       for (let stats of statsList) {
         allStatsList.push(stats);
       }
