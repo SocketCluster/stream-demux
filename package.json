@@ -4,7 +4,7 @@
   "description": "A consumable stream demultiplexer.",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/mocha/bin/_mocha --reporter spec --timeout 10000 --slow 10000"
+    "test": "mocha --reporter spec --timeout 10000 --slow 10000"
   },
   "repository": {
     "type": "git",
@@ -25,10 +25,10 @@
   },
   "homepage": "https://github.com/SocketCluster/stream-demux#readme",
   "devDependencies": {
-    "mocha": "^10.2.0"
+    "mocha": "^12.0.3"
   },
   "dependencies": {
     "consumable-stream": "^3.0.0",
-    "writable-consumable-stream": "^4.1.0"
+    "writable-consumable-stream": "^4.3.0"
   }
 }

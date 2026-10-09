@@ -3,7 +3,14 @@ const DemuxedConsumableStream = require('./demuxed-consumable-stream');
 
 class StreamDemux {
   constructor() {
-    this.streams = {};
+    // A null-prototype object is used so that stream names which collide with
+    // Object.prototype members (such as __proto__, constructor or toString)
+    // are treated as ordinary stream names instead of resolving to inherited
+    // properties. Without this, lookups such as this.streams[streamName]
+    // return an inherited value for those names; the truthiness checks
+    // throughout this class then pass and the subsequent stream method call
+    // throws a TypeError.
+    this.streams = Object.create(null);
     this._nextConsumerId = 1;
     this.generateConsumerId = () => {
       return this._nextConsumerId++;
