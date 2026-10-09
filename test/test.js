@@ -895,4 +895,252 @@ describe('StreamDemux', () => {
     assert.equal(demux.hasConsumerAll(consumerA.id), true);
     assert.equal(demux.hasConsumerAll(consumerB.id), true);
   });
+
+  it('should not attribute packets addressed to one consumer to the other consumers of the same stream', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hello').createConsumer();
+
+    for (let i = 0; i < 10; i++) {
+      demux.writeToConsumer(consumerA.id, 'for-a' + i);
+    }
+
+    assert.equal(demux.getConsumerBackpressure(consumerA.id), 10);
+    assert.equal(demux.getConsumerBackpressure(consumerB.id), 0);
+    assert.equal(demux.getBackpressure('hello'), 10);
+    assert.equal(demux.getBackpressureAll(), 10);
+  });
+
+  it('should attribute broadcast packets to every consumer of the stream', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hello').createConsumer();
+
+    demux.write('hello', 'one');
+    demux.writeToConsumer(consumerA.id, 'for-a');
+    demux.write('hello', 'two');
+
+    assert.equal(demux.getConsumerBackpressure(consumerA.id), 3);
+    assert.equal(demux.getConsumerBackpressure(consumerB.id), 2);
+  });
+
+  it('should not reset a consumer timeout when a packet is addressed to a different consumer of the same stream', async () => {
+    let victim = demux.stream('hello').createConsumer(100);
+    let other = demux.stream('hello').createConsumer();
+
+    let error;
+    let consumeVictim = (async () => {
+      try {
+        for await (let packet of victim) {}
+      } catch (err) {
+        error = err;
+      }
+    })();
+
+    let spam = (async () => {
+      for (let i = 0; i < 15; i++) {
+        demux.writeToConsumer(other.id, 'spam' + i);
+        await wait(20);
+      }
+    })();
+
+    await Promise.all([consumeVictim, spam]);
+
+    assert.notEqual(error, null);
+    assert.equal(error.name, 'TimeoutError');
+  });
+
+  it('should deliver targeted packets only to the consumer they were addressed to', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hello').createConsumer();
+
+    let receivedA = [];
+    let receivedB = [];
+
+    let consumeA = (async () => {
+      while (true) {
+        let packet = await consumerA.next();
+        if (packet.done) break;
+        receivedA.push(packet.value);
+      }
+    })();
+    let consumeB = (async () => {
+      while (true) {
+        let packet = await consumerB.next();
+        if (packet.done) break;
+        receivedB.push(packet.value);
+      }
+    })();
+
+    await wait(10);
+
+    demux.writeToConsumer(consumerA.id, 'secret-a');
+    demux.write('hello', 'public');
+    demux.writeToConsumer(consumerB.id, 'secret-b');
+    demux.close('hello');
+
+    await Promise.all([consumeA, consumeB]);
+
+    assert.equal(JSON.stringify(receivedA), JSON.stringify(['secret-a', 'public']));
+    assert.equal(JSON.stringify(receivedB), JSON.stringify(['public', 'secret-b']));
+  });
+
+  it('should report queue depth separately from backpressure', async () => {
+    let idle = demux.stream('hello').createConsumer();
+    let active = demux.stream('hello').createConsumer();
+
+    let consumeActive = (async () => {
+      for await (let packet of active) {}
+    })();
+
+    await wait(10);
+
+    for (let i = 0; i < 10; i++) {
+      demux.writeToConsumer(active.id, 'for-active' + i);
+    }
+
+    assert.equal(demux.getConsumerBackpressure(idle.id), 0);
+    assert.equal(demux.getConsumerQueueDepth(idle.id), 10);
+    assert.equal(demux.getQueueDepth('hello'), 10);
+    assert.equal(demux.getQueueDepthAll(), 10);
+
+    await wait(50);
+
+    // The active consumer has caught up, so its own backpressure is zero, but
+    // the 10 items are still unprocessed by the idle consumer, so the stream
+    // still reports them as pending work.
+    assert.equal(demux.getConsumerBackpressure(active.id), 0);
+    assert.equal(demux.getBackpressureAll(), 10);
+    assert.equal(demux.getQueueDepthAll(), 10);
+
+    demux.close('hello');
+    await consumeActive;
+  });
+
+  it('should report zero queue depth for unknown streams and consumers', async () => {
+    assert.equal(demux.getQueueDepth('does-not-exist'), 0);
+    assert.equal(demux.getQueueDepthAll(), 0);
+    assert.equal(demux.getConsumerQueueDepth(12345), 0);
+  });
+
+  it('should drop back to zero queue depth once every consumer has caught up', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hello').createConsumer();
+
+    let consumeA = (async () => {
+      for await (let packet of consumerA) {}
+    })();
+    let consumeB = (async () => {
+      for await (let packet of consumerB) {}
+    })();
+
+    await wait(10);
+
+    for (let i = 0; i < 10; i++) {
+      demux.write('hello', 'hello' + i);
+    }
+
+    await wait(50);
+
+    assert.equal(demux.getQueueDepthAll(), 0);
+
+    demux.close('hello');
+    await Promise.all([consumeA, consumeB]);
+  });
+
+  it('should end a consuming loop when return() is called in the same tick as a write', async () => {
+    let consumer = demux.stream('hello').createConsumer();
+
+    let error;
+    let ended = false;
+    let consume = (async () => {
+      try {
+        for await (let packet of consumer) {}
+        ended = true;
+      } catch (err) {
+        error = err;
+      }
+    })();
+
+    await wait(10);
+
+    // The write resolves the parked next() call; the return() which follows in
+    // the same tick used to leave that call with no packet to terminate on and
+    // no currentNode to read, throwing a TypeError out of the consuming loop.
+    demux.write('hello', 'packet');
+    consumer.return();
+
+    await consume;
+
+    assert.equal(error, undefined);
+    assert.equal(ended, true);
+    assert.equal(demux.getConsumerCountAll(), 0);
+  });
+
+  it('should end a consuming loop when return() is called in the same tick as a targeted write', async () => {
+    let consumer = demux.stream('hello').createConsumer();
+
+    let error;
+    let ended = false;
+    let consume = (async () => {
+      try {
+        for await (let packet of consumer) {}
+        ended = true;
+      } catch (err) {
+        error = err;
+      }
+    })();
+
+    await wait(10);
+
+    demux.writeToConsumer(consumer.id, 'packet');
+    consumer.return();
+
+    await consume;
+
+    assert.equal(error, undefined);
+    assert.equal(ended, true);
+  });
+
+  it('should end a consuming loop when return() is called in the same tick as a close', async () => {
+    let consumer = demux.stream('hello').createConsumer();
+
+    let error;
+    let ended = false;
+    let consume = (async () => {
+      try {
+        for await (let packet of consumer) {}
+        ended = true;
+      } catch (err) {
+        error = err;
+      }
+    })();
+
+    await wait(10);
+
+    demux.close('hello', 'end');
+    consumer.return();
+
+    await consume;
+
+    assert.equal(error, undefined);
+    assert.equal(ended, true);
+  });
+
+  it('should reclaim the stream after return() races a write', async () => {
+    let consumer = demux.stream('hello').createConsumer();
+
+    let consume = (async () => {
+      for await (let packet of consumer) {}
+    })();
+
+    await wait(10);
+
+    demux.write('hello', 'packet');
+    consumer.return();
+
+    await consume;
+
+    assert.equal(demux.getConsumerCount('hello'), 0);
+    assert.equal(demux.hasConsumerAll(consumer.id), false);
+    assert.equal(Object.keys(demux.streams).length, 0);
+  });
 });

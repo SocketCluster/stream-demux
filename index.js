@@ -133,6 +133,32 @@ class StreamDemux {
     return 0;
   }
 
+  // Backpressure is pending processing work: a stream counts every unprocessed
+  // item in its queue, a consumer only its own share. Queue depth instead
+  // counts the nodes a consumer still pins in memory, addressed to it or not.
+  getQueueDepth(streamName) {
+    if (this.streams[streamName]) {
+      return this.streams[streamName].getQueueDepth();
+    }
+    return 0;
+  }
+
+  getQueueDepthAll() {
+    return Object.values(this.streams).reduce(
+      (max, stream) => Math.max(max, stream.getQueueDepth()),
+      0
+    );
+  }
+
+  getConsumerQueueDepth(consumerId) {
+    for (let stream of Object.values(this.streams)) {
+      if (stream.hasConsumer(consumerId)) {
+        return stream.getConsumerQueueDepth(consumerId);
+      }
+    }
+    return 0;
+  }
+
   hasConsumer(streamName, consumerId) {
     if (this.streams[streamName]) {
       return this.streams[streamName].hasConsumer(consumerId);
