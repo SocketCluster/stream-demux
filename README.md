@@ -96,6 +96,37 @@ function wait(duration) {
 })();
 ```
 
+## Consumer lifetime
+
+A `StreamDemux` owns its streams; each one is created on demand when a consumer
+asks for it by name and is dropped as soon as its last consumer goes away. That
+is why no cleanup is needed beyond ending consumption, which you do by breaking
+out of the `for-await-of` loop, or by calling `consumer.return()`, `kill()` or
+`killAll()`.
+
+A consequence is that a consumer must not be reused once its iteration has
+ended. Create a new one instead:
+
+```js
+let consumer = demux.stream('abc').createConsumer();
+for await (let packet of consumer) {
+  if (packet === 'stop') break;
+}
+
+// Do not iterate `consumer` again; ask the demux for a new one.
+let nextConsumer = demux.stream('abc').createConsumer();
+```
+
+Reusing a consumer after its loop has ended leaves it attached to a stream the
+demux has already dropped, so it will never receive anything written through
+`demux.write()` and cannot be reached by `kill()` or `close()`. (A consumer
+created directly on a `WritableConsumableStream` *can* be reused, because there
+the stream's lifetime is yours to manage rather than the demux's.)
+
+`demux.unstream(streamName)` detaches a stream from the demux and kills its
+consumers, so their loops end rather than hanging on a stream nothing can
+reach any more.
+
 ## Goal
 
 The goal of this module is to facilitate functional programming patterns which decrease the probability of memory leaks and race conditions.

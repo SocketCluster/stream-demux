@@ -1143,4 +1143,127 @@ describe('StreamDemux', () => {
     assert.equal(demux.hasConsumerAll(consumer.id), false);
     assert.equal(Object.keys(demux.streams).length, 0);
   });
+
+  it('should terminate consumers when their stream is detached with unstream', async () => {
+    let consumerA = demux.stream('hello').createConsumer();
+    let consumerB = demux.stream('hello').createConsumer();
+
+    let endedA = false;
+    let endedB = false;
+    let error;
+
+    let consumeA = (async () => {
+      try {
+        for await (let packet of consumerA) {}
+        endedA = true;
+      } catch (err) {
+        error = err;
+      }
+    })();
+    let consumeB = (async () => {
+      try {
+        for await (let packet of consumerB) {}
+        endedB = true;
+      } catch (err) {
+        error = err;
+      }
+    })();
+
+    await wait(10);
+
+    demux.unstream('hello');
+
+    await Promise.all([consumeA, consumeB]);
+
+    assert.equal(error, undefined);
+    assert.equal(endedA, true);
+    assert.equal(endedB, true);
+    assert.equal(consumerA.isAlive, false);
+    assert.equal(consumerB.isAlive, false);
+  });
+
+  it('should leave no stream or consumer behind after unstream', async () => {
+    let consumer = demux.stream('hello').createConsumer();
+
+    let consume = (async () => {
+      for await (let packet of consumer) {}
+    })();
+
+    await wait(10);
+
+    demux.unstream('hello');
+    await consume;
+
+    assert.equal(Object.keys(demux.streams).length, 0);
+    assert.equal(demux.getConsumerCountAll(), 0);
+    assert.equal(demux.hasConsumerAll(consumer.id), false);
+    assert.equal(demux.getConsumerStats(consumer.id), undefined);
+  });
+
+  it('should support unstream on a stream which does not exist', async () => {
+    demux.unstream('does-not-exist');
+
+    assert.equal(Object.keys(demux.streams).length, 0);
+  });
+
+  it('should let a stream be recreated after unstream', async () => {
+    let oldConsumer = demux.stream('hello').createConsumer();
+    let consumeOld = (async () => {
+      for await (let packet of oldConsumer) {}
+    })();
+
+    await wait(10);
+    demux.unstream('hello');
+    await consumeOld;
+
+    let newConsumer = demux.stream('hello').createConsumer();
+    let received = [];
+    let consumeNew = (async () => {
+      for await (let packet of newConsumer) {
+        received.push(packet);
+      }
+    })();
+
+    await wait(10);
+    demux.write('hello', 'fresh');
+    demux.close('hello');
+    await consumeNew;
+
+    assert.equal(JSON.stringify(received), JSON.stringify(['fresh']));
+  });
+
+  it('should not let a replaced stream remove its successor from the map', async () => {
+    // A consumer can outlive the stream it was created on, by being reused
+    // after return(). When it is finally removed, its stream must not delete
+    // the entry which a newer stream of the same name now owns.
+    let oldConsumer = demux.createConsumer('hello');
+    oldConsumer.return();
+    assert.equal(demux.streams['hello'], undefined);
+
+    // Reusing it re-registers it on the stream which is no longer in the map.
+    oldConsumer.next();
+    await wait(10);
+
+    let newConsumer = demux.createConsumer('hello');
+    let newStream = demux.streams['hello'];
+    let received = [];
+    let consumeNew = (async () => {
+      for await (let packet of newConsumer) {
+        received.push(packet);
+      }
+    })();
+
+    await wait(10);
+
+    oldConsumer.return();
+
+    assert.equal(demux.streams['hello'], newStream);
+    assert.equal(demux.hasConsumerAll(newConsumer.id), true);
+
+    demux.write('hello', 'still-working');
+    demux.close('hello');
+    await consumeNew;
+
+    assert.equal(JSON.stringify(received), JSON.stringify(['still-working']));
+  });
 });

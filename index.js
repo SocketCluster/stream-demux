@@ -186,14 +186,21 @@ class StreamDemux {
 
   createConsumer(streamName, timeout) {
     if (!this.streams[streamName]) {
-      this.streams[streamName] = new WritableConsumableStream({
+      // The callback checks the stream it belongs to rather than whatever is
+      // currently registered under streamName, so a stream which has already
+      // been replaced can never remove its successor from the map. Capturing
+      // the stream allocates nothing: the callback is stored on the stream
+      // either way, so this only adds a binding to a closure which the stream
+      // already holds, and the resulting cycle is collected along with it.
+      let stream = new WritableConsumableStream({
         generateConsumerId: this.generateConsumerId,
         removeConsumerCallback: () => {
-          if (!this.getConsumerCount(streamName)) {
+          if (this.streams[streamName] === stream && !stream.getConsumerCount()) {
             delete this.streams[streamName];
           }
         }
       });
+      this.streams[streamName] = stream;
     }
     return this.streams[streamName].createConsumer(timeout);
   }
@@ -204,7 +211,15 @@ class StreamDemux {
     return new DemuxedConsumableStream(this, streamName);
   }
 
+  // Kills the stream's consumers before detaching it. A consumer left attached
+  // to a detached stream could not be reached again through the demux: writes
+  // would go to a freshly created stream and kill()/close() could not see it,
+  // so its for-await-of loop would never end.
   unstream(streamName) {
+    let stream = this.streams[streamName];
+    if (stream) {
+      stream.kill();
+    }
     delete this.streams[streamName];
   }
 }
